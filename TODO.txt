@@ -1,0 +1,2 @@
+1. Do all the TODO scattered around the code
+2. Implement support for keep-alive and possibly pipelined HTTP support

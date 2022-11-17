@@ -5,6 +5,9 @@ struct transport_private {
   int emulatedSockFD;
 };
 
+// TODO: Implement this and create socket faker
+// by creating socket pair and have I/O threads
+// to call appropriate method
 static int impl_get_sockfd(struct transport* self) {
   return -ENOSYS;
 }
