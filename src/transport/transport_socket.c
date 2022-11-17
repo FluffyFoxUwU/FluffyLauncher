@@ -13,15 +13,19 @@
 static int impl_write(struct transport* _self, const void* data, size_t len);
 static int impl_read(struct transport* _self, void* result, size_t len, size_t* szRead); 
 static void impl_close(struct transport* _self);
+static int impl_get_sockfd(struct transport* _self);
 
 struct transport_socket* transport_socket_new(int timeoutMilis) {
   struct transport_socket* self = malloc(sizeof(*self));
   if (!self)
     return NULL;
   
-  transport_base_init(&self->super, timeoutMilis);
+  if (transport_base_init(&self->super, timeoutMilis) < 0)
+    return NULL;
+  
   self->super.close = impl_close;
   self->super.read = impl_read;
+  self->super.get_sockfd = impl_get_sockfd;
   self->super.write = impl_write;
   
   self->fd = -1;
@@ -31,6 +35,7 @@ struct transport_socket* transport_socket_new(int timeoutMilis) {
 void transport_socket_free(struct transport_socket* self) {
   if (!self)
     return;
+  transport_base_close(&self->super);
   
   // Keep trying to close if interrupted
   while (close(self->fd) == -1 && errno == -EINTR)
@@ -83,18 +88,6 @@ static int commonPerformIO(ssize_t (*action)(int,void*,size_t,int), int fd, void
   return res;
 }
 
-int transport_socket_write(struct transport_socket* self, const void* data, size_t len) {
-  if (self->fd < 0)
-    return -EINVAL;
-  return commonPerformIO((void*) send, self->fd, (void*) data, len, NULL);
-}
-
-int transport_socket_read(struct transport_socket* self, void* result, size_t len, size_t* szRead) {
-  if (self->fd < 0)
-    return -EINVAL;
-  return commonPerformIO(recv, self->fd, result, len, szRead);
-}
-
 int transport_socket_connect(struct transport_socket* self, struct ip_address* addr) {
   self->connectAddr = *addr;
   int res = 0;
@@ -108,14 +101,24 @@ int transport_socket_connect(struct transport_socket* self, struct ip_address* a
 
 // Implementations 
 static int impl_write(struct transport* _self, const void* data, size_t len) {
-  return transport_socket_write(SELF(_self), data, len);
+  struct transport_socket* self = SELF(_self);
+  if (self->fd < 0)
+    return -EINVAL;
+  return commonPerformIO((void*) send, self->fd, (void*) data, len, NULL);
 }
 
 static int impl_read(struct transport* _self, void* result, size_t len, size_t* szRead) {
-  return transport_socket_read(SELF(_self), result, len, szRead);
+  struct transport_socket* self = SELF(_self);
+  if (self->fd < 0)
+    return -EINVAL;
+  return commonPerformIO(recv, self->fd, result, len, szRead);
 }
 
 static void impl_close(struct transport* _self) {
   transport_socket_free(SELF(_self));
+}
+
+static int impl_get_sockfd(struct transport* _self) {
+  return SELF(_self)->fd;
 }
 

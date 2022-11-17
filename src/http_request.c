@@ -16,6 +16,12 @@
 #include "util.h"
 #include "vec.h"
 
+// TODO: Split this file into smaller chunks
+// which does specific part of HTTP request like
+// a seperate file just containing function to
+// generate request payload and another for 
+// parsing response
+
 struct http_request* http_new_request() {
   struct http_request* self = malloc(sizeof(*self));
   if (!self)
@@ -24,6 +30,7 @@ struct http_request* http_new_request() {
   *self = (struct http_request) {};
   self->headers = http_headers_new();
   self->isMethodSet = false;
+  self->canFreeLocation = false;
   if (!self->headers)
     goto headers_alloc_fail;
   
@@ -39,7 +46,8 @@ void http_free_request(struct http_request* self) {
     return;
   
   http_headers_free(self->headers);
-  free((char*) self->location);
+  if (self->canFreeLocation)
+    free((char*) self->location);
   free(self);
 }
 
@@ -52,12 +60,20 @@ void http_free_response(struct http_response* self) {
   free(self);
 }
 
-int http_set_location(struct http_request* self, const char* urlFmt, ...) {
+int http_set_location_formatted(struct http_request* self, const char* urlFmt, ...) {
   va_list list;
   va_start(list, urlFmt);
-  int res = http_set_url_va(self, urlFmt, list);
+  int res = http_set_location_formatted_va(self, urlFmt, list);
   va_end(list);
   return res;
+}
+
+void http_set_location(struct http_request* self, const char* location) {
+  if (self->canFreeLocation)
+    free((char*) self->location);
+  
+  self->location = location;
+  self->canFreeLocation = false;
 }
 
 static bool isValidLocation(const char* location) {
@@ -90,23 +106,24 @@ static bool isValidLocation(const char* location) {
   return true;
 }
 
-int http_set_url_va(struct http_request* self, const char* urlFmt, va_list list) {
+int http_set_location_formatted_va(struct http_request* self, const char* urlFmt, va_list list) {
   util_asprintf((char**) &self->location, urlFmt, list);
   if (!self->location)
     return -ENOMEM;
-    
+  
   if (!isValidLocation(self->location)) {
     free((char*) self->location);
     self->location = NULL;
     return -EINVAL;
   }
+  
+  self->canFreeLocation = true;
   return 0;
 }
 
-int http_set_method(struct http_request* self, enum http_method method) {
+void http_set_method(struct http_request* self, enum http_method method) {
   self->method = method;
-  self->isMethodSet = true;
-  return 0;
+  self->isMethodSet = true; 
 }
 
 static const char* methodAsString(enum http_method method) {
@@ -468,6 +485,8 @@ int http_exec(struct http_request* self, struct transport* transport, struct htt
     default:
       BUG();
   }
+
+  res = response->status;
 
 unknown_transfer_method:
 read_response_failure: 

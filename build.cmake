@@ -20,6 +20,7 @@ set(BUILD_SOURCES
   src/http_headers.c
   src/http_headers_serializer/normal.c
   src/transport/transport_socket.c
+  src/transport/transport_ssl.c
   src/transport/transport.c
   src/networking.c
 

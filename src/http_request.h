@@ -28,6 +28,7 @@ struct http_request {
   bool isMethodSet;
   enum http_method method;
   
+  bool canFreeLocation;
   const char* location;
   
   struct http_headers* headers;
@@ -44,6 +45,7 @@ struct http_response {
   struct http_headers* headers;
 };
 
+[[nodiscard]]
 struct http_request* http_new_request();
 void http_free_request(struct http_request* self);
 
@@ -61,11 +63,16 @@ void http_free_response(struct http_response* self);
 // -EFAULT: Malformed server response
 // -EINVAL: Invalid state
 // -ENOTSUP: Server transfer encoding unsupported
+[[nodiscard]]
 int http_exec(struct http_request* self, struct transport* transport, struct http_response** response, FILE* writeTo);
 
-int http_set_method(struct http_request* self, enum http_method method);
-int http_set_location(struct http_request* self, const char* url, ...);
-int http_set_url_va(struct http_request* self, const char* url, va_list list);
+void http_set_method(struct http_request* self, enum http_method method);
+void http_set_location(struct http_request* self, const char* location);
+
+[[nodiscard]]
+int http_set_location_formatted(struct http_request* self, const char* location, ...);
+[[nodiscard]]
+int http_set_location_formatted_va(struct http_request* self, const char* location, va_list list);
 
 #endif
 

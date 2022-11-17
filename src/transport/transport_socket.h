@@ -11,13 +11,12 @@ struct transport_socket {
   int fd;
 };
 
+[[nodiscard]]
 struct transport_socket* transport_socket_new(int timeoutMilis);
-int transport_socket_connect(struct transport_socket* self, struct ip_address* addr);
 void transport_socket_free(struct transport_socket* self);
 
-int transport_socket_write(struct transport_socket* self, const void* data, size_t len);
-int transport_socket_read(struct transport_socket* self, void* result, size_t len, size_t* szRead); 
-void transport_socket_close(struct transport_socket* self);
+[[nodiscard]]
+int transport_socket_connect(struct transport_socket* self, struct ip_address* addr);
 
 #endif
 

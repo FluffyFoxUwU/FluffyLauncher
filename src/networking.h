@@ -44,9 +44,12 @@ struct ip_address {
 // -ESRCH: Can't be resolved
 // -EINVAL: Invalid flags
 // -EAGAIN: Try again later
+[[nodiscard]]
 int networking_resolve(const char* name, struct ip_address* addr, int flags);
 
-// Convert address to textual representation or NULL on error
+// Convert address to malloc'ed textual representation or NULL on error
+
+[[nodiscard]] 
 char* networking_tostring(struct ip_address* addr);
 
 int networking_to_af(enum ip_family family);
@@ -54,6 +57,7 @@ int networking_to_pf(enum ip_family family);
 int networking_to_sock_type(enum network_protocol family);
 
 // Wrapper around `socket`
+[[nodiscard]]
 int networking_socket(struct ip_address* addr, int sockType);
 
 // Return socket fd on success
@@ -63,6 +67,7 @@ int networking_socket(struct ip_address* addr, int sockType);
 // -ENETDOWN: Network unavailable
 // -ECONNREFUSED: Connnection refused
 // -EHOSTUNREACH: Host is down
+[[nodiscard]]
 int networking_connect(struct ip_address* addr, enum network_protocol protocol);
 
 #endif
