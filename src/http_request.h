@@ -11,7 +11,7 @@
 #include "hashmap.h"
 
 #define HTTP_PROTOCOL_VERSION_MAJOR_ONLY "HTTP/1"
-#define HTTP_PROTOCOL_VERSION "HTTP/1.0"
+#define HTTP_PROTOCOL_VERSION "HTTP/1.1"
 
 struct http_headers;
 struct transport;

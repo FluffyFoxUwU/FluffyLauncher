@@ -23,6 +23,7 @@ set(BUILD_SOURCES
   src/transport/transport_ssl.c
   src/transport/transport.c
   src/networking.c
+  src/parser/sjson.c
 
   deps/vec/vec.c
   deps/buffer/buffer.c

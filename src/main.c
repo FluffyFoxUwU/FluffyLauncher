@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <openssl/ssl.h>
 
+#include "auth/microsoft_auth.h"
 #include "bug.h"
 #include "http_headers.h"
 #include "http_request.h"
@@ -10,6 +11,7 @@
 #include "transport/transport.h"
 #include "transport/transport_socket.h"
 #include "transport/transport_ssl.h"
+#include "config.h"
 
 int main2(int argc, char** argv) {
   SSL_load_error_strings();
@@ -18,27 +20,42 @@ int main2(int argc, char** argv) {
   OpenSSL_add_all_ciphers();
   OpenSSL_add_all_digests();
   
+  /*struct microsoft_auth_result* result = NULL;
+  struct microsoft_auth_arg arg = {
+    .clientID = CONFIG_AUTH_AZURE_CLIENT_ID,
+    .tenant = "consumers",
+    .hostname = "login.microsoftonline.com",
+    .scope = "XboxLive.signin",
+    
+    .protocol = MICROSOFT_AUTH_HTTPS,
+    .port = 80
+  };
+  
+  int res = microsoft_auth(&result, &arg);
+  printf("Res: %d\n", res);
+  microsoft_auth_free(result);*/
+  
   // https://launchermeta.mojang.com/mc/game/version_manifest.json
   FILE* manifestFile = fopen("./manifest.json", "w");
   BUG_ON(!manifestFile);
   
   struct ip_address ip;
-  int resolveRes = networking_resolve("launchermeta.mojang.com", &ip, NETWORKING_RESOLVE_PREFER_IPV4);
+  int resolveRes = networking_resolve("localhost", &ip, NETWORKING_RESOLVE_PREFER_IPV4);
   BUG_ON(resolveRes < 0);
-  ip.port = 443;
+  ip.port = 80;
   
   struct transport_socket* socketTransport = transport_socket_new(1000);
   transport_socket_connect(socketTransport, &ip);
   
-  struct transport_ssl* sslTransport = transport_ssl_new(&socketTransport->super, true);
-  BUG_ON(transport_ssl_connect(sslTransport, TRANSPORT_TLS_ANY) < 0);
-  BUG_ON(transport_ssl_verify_host(sslTransport) == false);
+  // struct transport_ssl* sslTransport = transport_ssl_new(&socketTransport->super, true);
+  // BUG_ON(transport_ssl_connect(sslTransport, TRANSPORT_TLS_ANY) < 0);
+  // BUG_ON(transport_ssl_verify_host(sslTransport) == false);
   
-  struct transport* transport = &sslTransport->super;
+  struct transport* transport = &socketTransport->super;
   
   struct http_request* req = http_new_request();
   struct http_response* res = NULL;
-  http_set_location(req, "/mc/game/version_manifest.json");
+  http_set_location(req, "/");
   http_set_method(req, HTTP_GET);
   
   http_headers_set(req->headers, "Host", "launchermeta.mojang.com");
@@ -53,8 +70,7 @@ int main2(int argc, char** argv) {
   http_free_response(res);
   http_free_request(req);
   
-  transport_ssl_free(sslTransport);
-  transport_socket_free(socketTransport);
+  transport->close(transport);
   fclose(manifestFile);
   
   // struct ip_address ip;
@@ -81,6 +97,8 @@ int main2(int argc, char** argv) {
   // fwrite(buffer, 1, 64, stdout);
   // puts("\n");
   // transport->close(transport);
+  
+  
   return EXIT_SUCCESS;
 }
 

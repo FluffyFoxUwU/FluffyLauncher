@@ -153,6 +153,8 @@ enum ssl_version transport_ssl_get_version(struct transport_ssl* self) {
 void transport_ssl_free(struct transport_ssl* self) {
   SSL_free(self->priv->ssl);
   SSL_CTX_free(self->priv->sslContext);
+  
+  self->transportLayer->close(self->transportLayer);
   free(self->priv);
   free(self);
 }

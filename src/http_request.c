@@ -214,7 +214,7 @@ malformed_response:
 
 static int sendRequest(struct http_request* self, struct transport* transport, const char* httpVer) {
   int res = 0;
-    buffer_t* requestPayload = buffer_new();
+  buffer_t* requestPayload = buffer_new();
   if (!requestPayload) {
     res = -ENOMEM;
     goto request_buffer_alloc_failure;
@@ -233,17 +233,16 @@ static int sendRequest(struct http_request* self, struct transport* transport, c
     goto payload_creation_failure;
   }
   
-  // Sending request headers
+  // Sending request
   res = transport->write(transport, buffer_string(requestPayload), buffer_length(requestPayload));
   buffer_free(requestPayload);
   if (res < 0) 
     goto write_request_payload_failure;
+  
   // Sending request body if exist
-  if (self->requestData) {
-    res = transport->write(transport, self->requestData, self->requestDataLen);
-    if (res < 0) 
-      goto write_request_payload_failure;
-  }
+  if (self->requestData) 
+    if ((res = transport->write(transport, self->requestData, self->requestDataLen)) < 0) 
+      goto write_request_payload_failure; 
 write_request_payload_failure:
 payload_creation_failure:
 serialize_request_header_failure:
@@ -286,7 +285,6 @@ static int readStatusLine(struct http_response* response, struct transport* tran
   // We expect server to return same major version in response but server
   // responsed in other HTTP major version which is unacceptable
   if (strncmp(protocol, HTTP_PROTOCOL_VERSION_MAJOR_ONLY, sizeof(HTTP_PROTOCOL_VERSION_MAJOR_ONLY) - 1) != 0) {
-    printf("'%s' != '%s'\n", protocol, HTTP_PROTOCOL_VERSION);
     res = -EFAULT;
     goto malformed_response;
   }
@@ -373,13 +371,83 @@ identity_encoding:;
 
 invalid_content_length_header:
 unknown_transfer_encoding:
-  printf("Unknown transfer method\n");
   return HTTP_TRANSFER_UNKNOWN;
 }
 
+static bool isHex(char chr) {
+  static bool lookup[256] = {
+    ['0'] = true, ['1'] = true, ['2'] = true, ['3'] = true, ['4'] = true, ['5'] = true, ['6'] = true, ['7'] = true,
+    ['8'] = true, ['9'] = true, ['a'] = true, ['b'] = true, ['c'] = true, ['d'] = true, ['e'] = true, ['f'] = true,
+    ['A'] = true, ['B'] = true, ['C'] = true, ['D'] = true, ['E'] = true, ['F'] = true
+  };
+  
+  return lookup[(int) chr];
+} 
+
+// TODO: Implement chunk-extension as defined by https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1
 static int readChunkedMode(struct http_response* response, struct transport* transport, struct transfer_method_data* transferMethodData) {
   int res = 0;
-  BUG(); // TODO: Implement chunked mode
+  buffer_t* line = buffer_new();
+  if (!line)
+    return -ENOMEM;
+  
+  puts("Chunked mode!");
+  size_t chunkSize = 0;
+  do {
+    if ((res = readOneLine(transport, line)) < 0)
+      goto fail_line_read;
+    
+    // Found great trick by just check for 0x and non hex then bail out instead
+    if (isHex(buffer_string(line)[0]) == false || 
+        strncmp(buffer_string(line), "0x", 2) == 0) {
+      res = -EFAULT;
+      goto malformed_chunked;
+    }
+    
+    errno = 0;
+    uintmax_t tmp = strtoumax(buffer_string(line), NULL, 16);
+    if (errno || tmp > SIZE_MAX) {
+      res = -EFAULT;
+      goto malformed_chunked;
+    }
+    chunkSize = (size_t) tmp;
+    
+    printf("Size: %zu\n", chunkSize);
+    if (chunkSize == 0)
+      goto skip_read;
+    
+    // Read data here
+    size_t readSize = 0;
+    char* buffer = malloc(chunkSize);
+    
+    res = transport->read(transport, buffer, chunkSize, &readSize);
+    if (fwrite(buffer, 1, readSize, transferMethodData->writeTarget) == 0) {
+      free(buffer);
+      return -EIO;
+    }
+    free(buffer);
+    response->writtenSize += readSize;
+    
+    if (res < 0)
+      goto transport_error;
+    buffer_clear(line);
+    
+    // Check for last \r\n sequence 
+    if ((res = readOneLine(transport, line)) < 0)
+      goto fail_line_read;
+    
+    if (buffer_length(line) != 0) {
+      res = -EFAULT;
+      goto malformed_chunked;
+    }
+skip_read:
+    buffer_clear(line);
+  } while (chunkSize != 0);
+
+transport_error:
+malformed_chunked:
+fail_line_read:  
+  buffer_free(line);
   return res;
 }
 
@@ -485,14 +553,18 @@ int http_exec(struct http_request* self, struct transport* transport, struct htt
     default:
       BUG();
   }
+  
+  if (res < 0)
+    goto transfer_error;
 
   res = response->status;
 
+transfer_error: 
 unknown_transfer_method:
 read_response_failure: 
 send_request_failure:
 headers_alloc_failure:
-  if (res < 0)
+  if (res < 0 || responsePtr == NULL)
     http_free_response(response);
 response_alloc_failure:
   if (responsePtr && res >= 0) 
