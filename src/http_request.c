@@ -312,6 +312,7 @@ enum transfer_method {
 
 // Contain information about transfer method
 struct transfer_method_data {
+  struct http_response* response; 
   FILE* writeTarget;
   
   union {
@@ -384,6 +385,14 @@ static bool isHex(char chr) {
   return lookup[(int) chr];
 } 
 
+static int bodyReceived(struct transfer_method_data* transferMethodData, const void* data, size_t len) {
+  fwrite(data, 1, len, transferMethodData->writeTarget);
+  if (ferror(transferMethodData->writeTarget) != 0)
+    return -EIO;
+  transferMethodData->response->writtenSize += len; 
+  return 0;
+}
+
 // TODO: Implement chunk-extension as defined by https://www.rfc-editor.org/rfc/rfc9112.html#section-7.1
 static int readChunkedMode(struct http_response* response, struct transport* transport, struct transfer_method_data* transferMethodData) {
   int res = 0;
@@ -391,7 +400,6 @@ static int readChunkedMode(struct http_response* response, struct transport* tra
   if (!line)
     return -ENOMEM;
   
-  puts("Chunked mode!");
   size_t chunkSize = 0;
   do {
     if ((res = readOneLine(transport, line)) < 0)
@@ -412,7 +420,6 @@ static int readChunkedMode(struct http_response* response, struct transport* tra
     }
     chunkSize = (size_t) tmp;
     
-    printf("Size: %zu\n", chunkSize);
     if (chunkSize == 0)
       goto skip_read;
     
@@ -421,15 +428,14 @@ static int readChunkedMode(struct http_response* response, struct transport* tra
     char* buffer = malloc(chunkSize);
     
     res = transport->read(transport, buffer, chunkSize, &readSize);
-    if (fwrite(buffer, 1, readSize, transferMethodData->writeTarget) == 0) {
-      free(buffer);
-      return -EIO;
-    }
-    free(buffer);
-    response->writtenSize += readSize;
-    
     if (res < 0)
       goto transport_error;
+      
+    res = bodyReceived(transferMethodData, buffer, chunkSize);
+    free(buffer);
+    if (res < 0)
+      goto io_error;
+    
     buffer_clear(line);
     
     // Check for last \r\n sequence 
@@ -444,6 +450,7 @@ skip_read:
     buffer_clear(line);
   } while (chunkSize != 0);
 
+io_error:
 transport_error:
 malformed_chunked:
 fail_line_read:  
@@ -456,13 +463,10 @@ static int readByLengthMode(struct http_response* response, struct transport* tr
   char buffer[4096] = {};
   size_t initialReadSize = transferMethodData->data.byContentLength.length % sizeof(buffer);
   size_t readSize = 0;
-  res = transport->read(transport, buffer, initialReadSize, &readSize);
-  if (fwrite(buffer, 1, readSize, transferMethodData->writeTarget) == 0)
-    return -EIO;
-  response->writtenSize += readSize;
-  
-  if (res < 0)
+  if ((res = transport->read(transport, buffer, initialReadSize, &readSize)) < 0)
     goto transport_error;
+  if ((res = bodyReceived(transferMethodData, buffer, readSize)) < 0)
+    goto io_error;
   
   // Number of full buffers to read
   size_t bufferCount = (transferMethodData->data.byContentLength.length - initialReadSize) / sizeof(buffer);
@@ -476,9 +480,9 @@ static int readByLengthMode(struct http_response* response, struct transport* tr
       goto transport_error;
   }
 
+io_error:
 transport_error:
-  if (res == -ENODATA)
-    res = 0;
+  BUG_ON(res == -ENODATA);
   return res;
 }
 
@@ -487,29 +491,40 @@ static int readUntilClosed(struct http_response* response, struct transport* tra
   char buffer[4096] = {};
   
   size_t sizeRead = 0;
-  while ((res = transport->read(transport, buffer, sizeof(buffer), &sizeRead)) >= 0) {
-    if (fwrite(buffer, 1, sizeRead, transferMethodData->writeTarget) == 0)
-      return -EIO;
-    response->writtenSize += sizeRead;
-  }
+  while ((res = transport->read(transport, buffer, sizeof(buffer), &sizeRead)) >= 0)
+    if ((res = bodyReceived(transferMethodData, buffer, sizeRead)) < 0)
+      goto io_error;
   
-  // Write the rest if something left when error occured
-  if (res < 0 && fwrite(buffer, 1, sizeRead, transferMethodData->writeTarget) == 0) {
-    response->writtenSize += sizeRead;
-    return -EIO;
-  }
-  
-  if (res == -ENODATA)
+  if (res == -ENODATA) {
+    if ((res = bodyReceived(transferMethodData, buffer, sizeRead)) < 0)
+      goto io_error;
     res = 0;
-  
+  }
+
+io_error:
   return res;
 }
 
-int http_exec(struct http_request* self, struct transport* transport, struct http_response** responsePtr, FILE* writeTo) {
+void http_set_transport(struct http_request* self, struct transport* transport) {
+  self->transport = transport;
+}
+
+int http_send(struct http_request* self) {
   if (self->location == NULL || !self->isMethodSet) 
     return -EINVAL;
   
   int res = 0;
+  // Sending request
+  if ((res = sendRequest(self, self->transport, HTTP_PROTOCOL_VERSION)) < 0)
+    goto send_request_failure; 
+
+send_request_failure:
+  return res;
+}
+
+int http_recv(struct http_request* self, struct http_response** responsePtr, FILE* writeTo) {
+  int res = 0;
+  
   struct http_response* response = malloc(sizeof(*response));
   if (!response) {
     res = -ENOMEM;
@@ -523,10 +538,7 @@ int http_exec(struct http_request* self, struct transport* transport, struct htt
     goto headers_alloc_failure;  
   }
   
-  // Sending request
-  if ((res = sendRequest(self, transport, HTTP_PROTOCOL_VERSION)) < 0)
-    goto send_request_failure;
-  
+  struct transport* transport = self->transport;
   // Reading response
   if ((res = readStatusLine(response, transport)) < 0)
     goto read_response_failure;
@@ -534,7 +546,8 @@ int http_exec(struct http_request* self, struct transport* transport, struct htt
     goto read_response_failure;
   
   struct transfer_method_data transferMethodData = {
-    .writeTarget = writeTo
+    .writeTarget = writeTo,
+    .response = response
   };
   enum transfer_method transferMethod = determineTransferMethod(response, &transferMethodData);
   switch (transferMethod) {
@@ -562,17 +575,14 @@ int http_exec(struct http_request* self, struct transport* transport, struct htt
 transfer_error: 
 unknown_transfer_method:
 read_response_failure: 
-send_request_failure:
 headers_alloc_failure:
   if (res < 0 || responsePtr == NULL)
     http_free_response(response);
 response_alloc_failure:
   if (responsePtr && res >= 0) 
     *responsePtr = response;
-  
   return res;
 }
-
 
 
 

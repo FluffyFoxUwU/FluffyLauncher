@@ -21,7 +21,7 @@ static int commonConnection(bool isSecure, const char* hostname, uint16_t port, 
   int res = 0;
   struct ip_address ip;
   struct transport* transportResult = NULL;
-  int resolveRes = networking_resolve("launchermeta.mojang.com", &ip, NETWORKING_RESOLVE_PREFER_IPV4);
+  int resolveRes = networking_resolve(hostname, &ip, NETWORKING_RESOLVE_PREFER_IPV4);
   if (resolveRes < 0)
     return -EFAULT;
   
@@ -66,7 +66,7 @@ ssl_connect_error:
     transport_ssl_free(sslTransport);
 ssl_transport_creation_error:
 connect_error:
-  if (res < 0)
+  if (res < 0 && !sslTransport)
     transport_socket_free(socketTransport);
 socket_transport_creation_error:
 ssl_not_needed:
@@ -105,9 +105,11 @@ static int stage1_run(struct stage1* stage1) {
   
   http_set_location(req, location);
   http_set_method(req, HTTP_POST);
+  
   if ((res = http_headers_set(req->headers, "Content-Type", "application/x-www-form-urlencoded")) < 0 ||
       (res = http_headers_set(req->headers, "Content-Length", requestBodyLenString)) < 0 ||
-      (res = http_headers_set(req->headers, "Accept", "application/json")) < 0) {
+      (res = http_headers_set(req->headers, "Accept", "application/json")) < 0 ||
+      (res = http_headers_set(req->headers, "Host", stage1->arg->hostname)) < 0) {
     BUG_ON(res == -EINVAL);
     res = -ENOMEM;
     goto request_preparation_error;
@@ -118,17 +120,23 @@ static int stage1_run(struct stage1* stage1) {
   
   // Do actual request
   struct transport* connection;
-  if ((res = commonConnection(false, stage1->arg->hostname, stage1->arg->port, &connection)) < 0)
-    goto create_ssl_connection_error; 
+  if ((res = commonConnection(true, stage1->arg->hostname, stage1->arg->port, &connection)) < 0) 
+    goto create_connection_error; 
   
-  res = http_exec(req, connection, NULL, stdout);
+  http_set_transport(req, connection);
+  res = http_send(req);
+  if (res < 0)
+    goto http_request_send_error;
+  
+  res = http_recv(req, NULL, stdout);
   if (res < 0 || res != 200) {
-    goto http_request_error;
+    goto http_request_recv_error;
   }
 
-http_request_error:
+http_request_recv_error:
+http_request_send_error:
   connection->close(connection);
-create_ssl_connection_error:
+create_connection_error:
 request_preparation_error:
   free(requestBodyLenString);
 request_body_len_error:

@@ -7,9 +7,11 @@
 #include "hashmap.h"
 #include "vec.h"
 #include "buffer.h"
+#include "list.h"
 
 struct http_headers {
   HASHMAP(char, vec_str_t) headers;
+  list_t* insertOrder;
 };
 
 enum http_headers_serialize_type {

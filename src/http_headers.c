@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 
 #include "http_headers.h"
+#include "list.h"
 #include "util.h"
 #include "hashmap.h"
 #include "http_headers_serializer/normal.h"
@@ -18,7 +20,17 @@ struct http_headers* http_headers_new() {
   hashmap_init(&self->headers, hashmap_hash_string, strcmp);
   self->headers.map_base.key_dup = (void* (*)(const void*)) strdup;
   self->headers.map_base.key_free = free;
+  
+  self->insertOrder = list_new();
+  if (!self->insertOrder)
+    goto failure;
+  self->insertOrder->free = free;
+    
   return self;
+
+failure:
+  http_headers_free(self);
+  return NULL;
 }
 
 void http_headers_free(struct http_headers* self) {
@@ -37,9 +49,12 @@ void http_headers_free(struct http_headers* self) {
   }
   
   hashmap_cleanup(&self->headers);
+  
+  list_destroy(self->insertOrder);
   free(self);
 }
 
+// `name` expect internal copy of name string
 static vec_str_t* getHeaderAutoAlloc(struct http_headers* self, const char* name) {
   vec_str_t* res = NULL;
   vec_str_t* headers = hashmap_get(&self->headers, name);
@@ -48,6 +63,14 @@ static vec_str_t* getHeaderAutoAlloc(struct http_headers* self, const char* name
     goto lookup_hit;
   }
   
+  char* copyOfName = strdup(name);
+  if (!copyOfName)
+    goto name_copy_error;
+  
+  list_node_t* node = list_node_new((char*) copyOfName);
+  if (!node)
+    goto node_alloc_failure;
+  
   headers = malloc(sizeof(*headers));
   if (!headers)
     goto header_alloc_failure;
@@ -55,12 +78,15 @@ static vec_str_t* getHeaderAutoAlloc(struct http_headers* self, const char* name
   
   if (hashmap_put(&self->headers, name, headers) < 0)
     goto header_add_failure;
+  list_rpush(self->insertOrder, node);
   
-  res = headers;
+  res = headers;  
 header_add_failure:
   if (!res)
     vec_deinit(headers);
 header_alloc_failure:
+node_alloc_failure:
+name_copy_error:
 lookup_hit:
   return res;
 }

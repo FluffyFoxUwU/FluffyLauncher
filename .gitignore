@@ -39,3 +39,4 @@ theme-defaults
 .vscode/**
 .vscode-test/**
 vsc-extension-quickstart.md
+secrets

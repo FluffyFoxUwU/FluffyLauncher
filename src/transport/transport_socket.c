@@ -104,14 +104,14 @@ static int impl_write(struct transport* _self, const void* data, size_t len) {
   struct transport_socket* self = SELF(_self);
   if (self->fd < 0)
     return -EINVAL;
-  return commonPerformIO((void*) write, self->fd, (void*) data, len, NULL);
+  return commonPerformIO((void*) send, self->fd, (void*) data, len, NULL);
 }
 
 static int impl_read(struct transport* _self, void* result, size_t len, size_t* szRead) {
   struct transport_socket* self = SELF(_self);
   if (self->fd < 0)
     return -EINVAL;
-  return commonPerformIO(read, self->fd, result, len, szRead);
+  return commonPerformIO(recv, self->fd, result, len, szRead);
 }
 
 static void impl_close(struct transport* _self) {

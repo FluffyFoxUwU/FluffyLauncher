@@ -20,7 +20,7 @@ int main2(int argc, char** argv) {
   OpenSSL_add_all_ciphers();
   OpenSSL_add_all_digests();
   
-  /*struct microsoft_auth_result* result = NULL;
+  struct microsoft_auth_result* result = NULL;
   struct microsoft_auth_arg arg = {
     .clientID = CONFIG_AUTH_AZURE_CLIENT_ID,
     .tenant = "consumers",
@@ -28,13 +28,14 @@ int main2(int argc, char** argv) {
     .scope = "XboxLive.signin",
     
     .protocol = MICROSOFT_AUTH_HTTPS,
-    .port = 80
+    .port = 443
   };
   
   int res = microsoft_auth(&result, &arg);
   printf("Res: %d\n", res);
-  microsoft_auth_free(result);*/
+  microsoft_auth_free(result); 
   
+  /*
   // https://launchermeta.mojang.com/mc/game/version_manifest.json
   FILE* manifestFile = fopen("./manifest.json", "w");
   BUG_ON(!manifestFile);
@@ -97,7 +98,7 @@ int main2(int argc, char** argv) {
   // fwrite(buffer, 1, 64, stdout);
   // puts("\n");
   // transport->close(transport);
-  
+  */
   
   return EXIT_SUCCESS;
 }

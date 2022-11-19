@@ -6,6 +6,7 @@
 
 #include "ssl_method_compat_layer.h"
 #include "bug.h"
+#include "transport/transport.h"
 #include "transport_ssl.h"
 #include "util.h"
 #include "transport.h"
@@ -151,6 +152,8 @@ enum ssl_version transport_ssl_get_version(struct transport_ssl* self) {
 }
 
 void transport_ssl_free(struct transport_ssl* self) {
+  transport_base_close(&self->super);
+  
   SSL_free(self->priv->ssl);
   SSL_CTX_free(self->priv->sslContext);
   

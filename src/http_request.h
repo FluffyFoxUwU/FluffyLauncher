@@ -35,6 +35,8 @@ struct http_request {
   
   size_t requestDataLen;
   void* requestData;
+  
+  struct transport* transport;
 };
 
 struct http_response {
@@ -52,7 +54,10 @@ void http_free_request(struct http_request* self);
 // Free response allocated by http_exec
 void http_free_response(struct http_response* self);
 
-// Return http response code on success
+void http_set_transport(struct http_request* self, struct transport* transport);
+
+// Send request
+// Return 0 on success
 // Negative on error:
 // -ENOMEM: Not enough memory
 // -ECONNREFUSED: Connection refused
@@ -64,7 +69,14 @@ void http_free_response(struct http_response* self);
 // -EINVAL: Invalid state
 // -ENOTSUP: Server transfer encoding unsupported
 [[nodiscard]]
-int http_exec(struct http_request* self, struct transport* transport, struct http_response** response, FILE* writeTo);
+int http_send(struct http_request* self);
+
+// Wait for request result
+// Return http status code on success
+// Errors:
+// See above
+[[nodiscard]]
+int http_recv(struct http_request* self, struct http_response** response, FILE* writeTo);
 
 void http_set_method(struct http_request* self, enum http_method method);
 void http_set_location(struct http_request* self, const char* location);

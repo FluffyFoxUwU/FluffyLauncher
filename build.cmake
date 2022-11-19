@@ -28,12 +28,16 @@ set(BUILD_SOURCES
   deps/vec/vec.c
   deps/buffer/buffer.c
   deps/templated-hashmap/hashmap.c
+  deps/list/list.c
+  deps/list/list_node.c
+  deps/list/list_iterator.c
 )
 
 set(BUILD_INCLUDE_DIRS
   deps/vec/ 
   deps/buffer/ 
   deps/templated-hashmap/ 
+  deps/list/ 
 )
 
 # Note that exe does not represent Windows' 
