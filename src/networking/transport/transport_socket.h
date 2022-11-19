@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "transport.h"
-#include "networking.h"
+#include "networking/networking.h"
 
 struct transport_socket {
   struct transport super;

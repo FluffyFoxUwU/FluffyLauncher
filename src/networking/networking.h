@@ -1,7 +1,6 @@
 #ifndef _headers_1667649555_FluffyLauncher_networking
 #define _headers_1667649555_FluffyLauncher_networking
 
-#include <netinet/in.h>
 #include <stdint.h>
 
 enum ip_family {

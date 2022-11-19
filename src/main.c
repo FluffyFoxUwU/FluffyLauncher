@@ -4,10 +4,10 @@
 
 #include "auth/microsoft_auth.h"
 #include "bug.h"
-#include "http_headers.h"
-#include "http_request.h"
+#include "networking/http_headers.h"
+#include "networking/http_request.h"
 #include "io_threads.h"
-#include "networking.h"
+#include "networking/networking.h"
 #include "transport/transport.h"
 #include "transport/transport_socket.h"
 #include "transport/transport_ssl.h"
