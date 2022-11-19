@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "ssl_method_compat_layer.h"
+#include "networking/ssl_method_compat_layer.h"
 #include "bug.h"
-#include "transport/transport.h"
+#include "networking/transport/transport.h"
 #include "transport_ssl.h"
 #include "util.h"
 #include "transport.h"

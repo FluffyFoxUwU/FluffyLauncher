@@ -16,14 +16,15 @@ set(BUILD_SOURCES
   src/dummy.c
   src/auth/microsoft_auth.c
   src/util.c
-  src/http_request.c
-  src/http_headers.c
-  src/http_headers_serializer/normal.c
-  src/transport/transport_socket.c
-  src/transport/transport_ssl.c
-  src/transport/transport.c
-  src/networking.c
+  src/networking/http_request.c
+  src/networking/http_headers.c
+  src/networking/http_headers_serializer/normal.c
+  src/networking/transport/transport_socket.c
+  src/networking/transport/transport_ssl.c
+  src/networking/transport/transport.c
+  src/networking/networking.c
   src/parser/sjson.c
+  src/io/io_threads.c
 
   deps/vec/vec.c
   deps/buffer/buffer.c

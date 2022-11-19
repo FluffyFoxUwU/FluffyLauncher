@@ -4,12 +4,12 @@
 #include <string.h>
 
 #include "bug.h"
-#include "http_headers.h"
+#include "networking/http_headers.h"
 #include "microsoft_auth.h"
-#include "http_request.h"
-#include "transport/transport.h"
-#include "transport/transport_socket.h"
-#include "transport/transport_ssl.h"
+#include "networking/http_request.h"
+#include "networking/transport/transport.h"
+#include "networking/transport/transport_socket.h"
+#include "networking/transport/transport_ssl.h"
 #include "util.h"
 
 struct stage1 {

@@ -1,7 +1,7 @@
 #ifndef _headers_1667641607_FluffyLauncher_transport_base
 #define _headers_1667641607_FluffyLauncher_transport_base
 
-#include "buffer.h"
+#include <stddef.h>
 
 struct transport {
   int timeoutMilis;

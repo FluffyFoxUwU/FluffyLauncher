@@ -6,11 +6,11 @@
 #include "bug.h"
 #include "networking/http_headers.h"
 #include "networking/http_request.h"
-#include "io_threads.h"
+#include "io/io_threads.h"
 #include "networking/networking.h"
-#include "transport/transport.h"
-#include "transport/transport_socket.h"
-#include "transport/transport_ssl.h"
+#include "networking/transport/transport.h"
+#include "networking/transport/transport_socket.h"
+#include "networking/transport/transport_ssl.h"
 #include "config.h"
 
 int main2(int argc, char** argv) {

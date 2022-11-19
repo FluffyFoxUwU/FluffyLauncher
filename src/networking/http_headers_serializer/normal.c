@@ -3,8 +3,8 @@
 
 #include "buffer.h"
 #include "hashmap.h"
-#include "http_headers.h"
-#include "http_headers_serializer/normal.h"
+#include "networking/http_headers.h"
+#include "networking/http_headers_serializer/normal.h"
 #include "list.h"
 #include "vec.h"
 
