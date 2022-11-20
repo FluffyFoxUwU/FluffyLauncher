@@ -15,8 +15,10 @@ set(BUILD_MAXIMUM_PERFORMANCE NO)
 set(BUILD_SOURCES
   src/auth/microsoft_auth.c
   src/auth/microsoft_auth/stage1.c
+  src/auth/microsoft_auth/stage2.c
   
   src/networking/http_request.c
+  src/networking/http_response.c
   src/networking/http_headers.c
   src/networking/http_headers_serializer/normal.c
   src/networking/transport/transport_socket.c

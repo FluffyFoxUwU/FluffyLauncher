@@ -35,26 +35,11 @@ struct http_request {
   
   size_t requestDataLen;
   void* requestData;
-  
-  struct transport* transport;
-};
-
-struct http_response {
-  int status;
-  const char* description;
-  size_t writtenSize;
-  
-  struct http_headers* headers;
 };
 
 [[nodiscard]]
-struct http_request* http_new_request();
-void http_free_request(struct http_request* self);
-
-// Free response allocated by http_exec
-void http_free_response(struct http_response* self);
-
-void http_set_transport(struct http_request* self, struct transport* transport);
+struct http_request* http_request_new();
+void http_request_free(struct http_request* self);
 
 // Send request
 // Return 0 on success
@@ -69,22 +54,15 @@ void http_set_transport(struct http_request* self, struct transport* transport);
 // -EINVAL: Invalid state
 // -ENOTSUP: Server transfer encoding unsupported
 [[nodiscard]]
-int http_send(struct http_request* self);
+int http_request_send(struct http_request* self, struct transport* transport);
 
-// Wait for request result
-// Return http status code on success
-// Errors:
-// See above
-[[nodiscard]]
-int http_recv(struct http_request* self, struct http_response** response, FILE* writeTo);
-
-void http_set_method(struct http_request* self, enum http_method method);
-void http_set_location(struct http_request* self, const char* location);
+void http_request_set_method(struct http_request* self, enum http_method method);
+void http_request_set_location(struct http_request* self, const char* location);
 
 [[nodiscard]]
-int http_set_location_formatted(struct http_request* self, const char* location, ...);
+int http_request_set_location_formatted(struct http_request* self, const char* location, ...);
 [[nodiscard]]
-int http_set_location_formatted_va(struct http_request* self, const char* location, va_list list);
+int http_request_set_location_formatted_va(struct http_request* self, const char* location, va_list list);
 
 #endif
 

@@ -1,7 +1,10 @@
 #ifndef _headers_1668919817_FluffyLauncher_stage1
 #define _headers_1668919817_FluffyLauncher_stage1
 
-#include "auth/microsoft_auth.h"
+#include <time.h>
+
+struct microsoft_auth_result;
+struct microsoft_auth_arg;
 
 struct microsoft_auth_stage1 {
   struct microsoft_auth_result* result;

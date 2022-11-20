@@ -2,11 +2,13 @@
 
 #include "stage1.h"
 #include "networking/http_request.h"
+#include "networking/http_response.h"
 #include "networking/http_headers.h"
 #include "util/util.h"
 #include "bug.h"
 #include "logging/logging.h"
 #include "networking/easy.h"
+#include "auth/microsoft_auth.h"
 
 struct microsoft_auth_stage1* microsoft_auth_stage1_new(struct microsoft_auth_result* result, struct microsoft_auth_arg* arg) {
   struct microsoft_auth_stage1* self = malloc(sizeof(*self));
@@ -29,10 +31,16 @@ static int processResponse(struct microsoft_auth_stage1* stage1, char* body, siz
 
 int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   int res = 0;
-  struct http_request* req = http_new_request();
+  struct http_request* req = http_request_new();
   if (!req) {
     res = -ENOMEM;
     goto request_creation_error;
+  }
+  
+  struct http_response* response = http_response_new();
+  if (!req) {
+    res = -ENOMEM;
+    goto response_creation_error;
   }
   
   char* location = NULL;
@@ -56,8 +64,8 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     goto request_body_len_error;
   }
   
-  http_set_location(req, location);
-  http_set_method(req, HTTP_POST);
+  http_request_set_location(req, location);
+  http_request_set_method(req, HTTP_POST);
   
   if ((res = http_headers_set(req->headers, "Content-Type", "application/x-www-form-urlencoded")) < 0 ||
       (res = http_headers_set(req->headers, "Content-Length", requestBodyLenString)) < 0 ||
@@ -85,12 +93,11 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   if ((res = networking_easy_new_connection(true, self->arg->hostname, self->arg->port, &connection)) < 0) 
     goto create_connection_error; 
   
-  http_set_transport(req, connection);
-  res = http_send(req);
+  res = http_request_send(req, connection);
   if (res < 0)
     goto http_request_send_error;
   
-  res = http_recv(req, NULL, responseBodyFile);
+  res = http_response_recv(response, connection, responseBodyFile);
   if (res < 0 || res != 200) {
     pr_error("Error getting devicecode. Server responseded with %d", res);
     goto http_request_recv_error;
@@ -123,8 +130,10 @@ request_body_len_error:
 request_body_creation_error:
   free(location);
 location_creation_error:
+  http_response_free(response);
+response_creation_error:
+  http_request_free(req);
 request_creation_error:
-  http_free_request(req);
   return res;
 }
 
