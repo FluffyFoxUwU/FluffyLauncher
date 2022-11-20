@@ -79,6 +79,9 @@ void logging_read_log(struct log_entry* entryPtr) {
 }
 
 void printk_va(const char* fmt, va_list args) {
+  // You may UwU-ify `fmt` here
+  // to UwU-ify every log entries
+
   va_list copy;
   va_copy(copy, args);
   size_t len = vsnprintf(NULL, 0, fmt, copy);

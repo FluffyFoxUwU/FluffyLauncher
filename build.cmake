@@ -35,6 +35,7 @@ set(BUILD_SOURCES
   src/io/io_threads.c
   
   src/dummy.c
+  src/auth/xbox_live_auth.c
 
   deps/vec/vec.c
   deps/buffer/buffer.c

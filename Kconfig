@@ -173,3 +173,6 @@ config ADVANCED_MODE
   help
     If you dont know what are you doing answer `n`
 
+config TMP_REFRESH_TOKEN
+  string "Refresh token"
+  default ""

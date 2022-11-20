@@ -32,7 +32,7 @@ static int processResponse(struct microsoft_auth_stage1* stage1, char* body, siz
   sjson_context* sjson = sjson_create_context(0, 0, NULL);
   sjson_node* root = sjson_decode(sjson, body);
   if (!root) {
-    pr_critical("Failure parsing server response body");
+    pr_critical("Failure parsing Microsoft server response body for device code");
     res = -EINVAL;
     goto invalid_response;
   }
@@ -123,7 +123,7 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     goto memstream_open_failed;
   }
   
-  pr_notice("Getting devicecode at %s:%d/%s", self->arg->hostname, self->arg->port, req->location);
+  // pr_notice("Getting devicecode at %s:%d/%s", self->arg->hostname, self->arg->port, req->location);
   // Do actual request
   struct transport* connection;
   if ((res = networking_easy_new_connection(true, self->arg->hostname, self->arg->port, &connection)) < 0) 

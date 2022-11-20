@@ -30,6 +30,10 @@ struct microsoft_auth_arg {
   const char* clientID;
   const char* hostname;
   
+  // Refresh token are used when available
+  // and fall back to device code flow to get new one
+  const char* refreshToken;
+  
   uint16_t port;
   enum microsoft_auth_protocol protocol;
 };

@@ -43,11 +43,10 @@ void microsoft_auth_stage2_free(struct microsoft_auth_stage2 *self) {
 
 static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLen) {
   int res = 0;
-  puts(body);
   sjson_context* sjson = sjson_create_context(0, 0, NULL);
   sjson_node* root = sjson_decode(sjson, body);
   if (!root) {
-    pr_critical("Failure parsing server response body");
+    pr_critical("Failure parsing Microsoft server response body for token");
     res = -EINVAL;
     goto invalid_response;
   }
@@ -119,7 +118,7 @@ invalid_response:
   return res;
 }
 
-static int pollForToken(struct microsoft_auth_stage2* self, struct http_request* pollReq) {
+static int tryGetToken(struct microsoft_auth_stage2* self, struct http_request* pollReq) {
   int res = 0;
   struct transport* connection;
   if ((res = networking_easy_new_connection(true, self->arg->hostname, self->arg->port, &connection)) < 0)
@@ -166,9 +165,8 @@ error_new_connection:
   return res;
 }
 
-int microsoft_auth_stage2_run(struct microsoft_auth_stage2* self) {
+static int devicodeAuth(struct microsoft_auth_stage2* self) {
   int res = 0;
-  
   char* location = NULL;
   util_asprintf(&location, "/%s/oauth2/v2.0/token", self->arg->tenant);
   if (!location) {
@@ -190,7 +188,7 @@ int microsoft_auth_stage2_run(struct microsoft_auth_stage2* self) {
   pr_alert("Open %s in your browser and provide %s code to authenticate", self->stage1->verificationURL, self->stage1->userCode);
   
   while (time(NULL) < self->stage1->expireTimestamp) {
-    if ((res = pollForToken(self, pollRequest)) < 0)
+    if ((res = tryGetToken(self, pollRequest)) < 0)
       goto poll_error;
     
     // Sucessfully get the token
@@ -216,4 +214,48 @@ location_creation_error:
   else if (res == -EPERM)
     pr_critical("Access declined cannot log in");
   return res;
+}
+
+static int refreshTokenAuth(struct microsoft_auth_stage2* self) {
+  int res = 0;
+  char* location = NULL;
+  util_asprintf(&location, "/%s/oauth2/v2.0/token", self->arg->tenant);
+  if (!location) {
+    res = -ENOMEM;
+    goto location_creation_error;
+  }
+  
+  char* requestBody = NULL;
+  size_t requestBodyLen = util_asprintf(&requestBody, "grant_type=refresh_token&client_id=%s&refresh_token=%s", self->arg->clientID, self->arg->refreshToken);
+  if (!requestBody) {
+    res = -ENOMEM;
+    goto request_body_creation_error;
+  }
+  
+  struct http_request* pollRequest = networking_easy_new_http(&res, HTTP_POST, self->arg->hostname, location, requestBody, requestBodyLen, "application/x-www-form-urlencoded", "application/json");  
+  if (!pollRequest) 
+    goto refresh_request_creation_error;
+  
+  pr_info("Authenticating via refresh token...");
+  res = tryGetToken(self, pollRequest);
+  
+  http_request_free(pollRequest);
+refresh_request_creation_error:
+  free(requestBody);
+request_body_creation_error:
+  free(location);
+location_creation_error:
+  return res;
+}
+
+int microsoft_auth_stage2_run(struct microsoft_auth_stage2* self) {
+  // Try using refresh token if any
+  if (self->arg->refreshToken) {
+    BUG_ON(self->stage1);
+    int res = refreshTokenAuth(self);
+    if (res >= 0)
+      return res;
+  }
+  
+  return devicodeAuth(self);
 }
