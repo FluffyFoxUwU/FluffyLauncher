@@ -1,7 +1,7 @@
 #ifndef _headers_1668919817_FluffyLauncher_stage1
 #define _headers_1668919817_FluffyLauncher_stage1
 
-#include <time.h>
+#include <stdint.h>
 
 struct microsoft_auth_result;
 struct microsoft_auth_arg;
@@ -15,8 +15,8 @@ struct microsoft_auth_stage1 {
   const char* userCode;
   const char* verificationURL;
   
-  time_t expireIn;
-  time_t pollSpeed;
+  uint64_t expireIn;
+  uint64_t pollInterval;
 };
 
 struct microsoft_auth_stage1* microsoft_auth_stage1_new(struct microsoft_auth_result* result, struct microsoft_auth_arg* arg);

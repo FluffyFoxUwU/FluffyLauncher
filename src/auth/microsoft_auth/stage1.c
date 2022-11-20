@@ -1,5 +1,8 @@
 #include <errno.h>
+#include <string.h>
+#include <limits.h>
 
+#include "parser/sjson.h"
 #include "stage1.h"
 #include "networking/http_request.h"
 #include "networking/http_response.h"
@@ -26,6 +29,49 @@ failure:
 
 static int processResponse(struct microsoft_auth_stage1* stage1, char* body, size_t bodyLen) {
   int res = 0;
+  sjson_context* sjson = sjson_create_context(0, 0, NULL);
+  sjson_node* root = sjson_decode(sjson, body);
+  if (root->tag != SJSON_OBJECT) {
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
+  sjson_node* deviceCode = sjson_find_member(root, "device_code");
+  sjson_node* userCode = sjson_find_member(root, "user_code");
+  sjson_node* verificationUrl = sjson_find_member(root, "verification_uri");
+  sjson_node* expireIn = sjson_find_member(root, "expires_in");
+  sjson_node* interval = sjson_find_member(root, "interval");
+  if (deviceCode->tag != SJSON_STRING ||
+      userCode->tag != SJSON_STRING ||
+      verificationUrl->tag != SJSON_STRING ||
+      expireIn->tag != SJSON_NUMBER ||
+      interval->tag != SJSON_NUMBER) {
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
+  // `interval` cant be zero as it would mean dont wait between polling
+  // which obvious why cant be zero
+  if (interval->number_ <= 0 || interval->number_ > (double) UINT64_MAX ||
+     expireIn->number_ < 0 || expireIn->number_ > (double) UINT64_MAX) {
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
+  stage1->pollInterval = interval->number_;
+  stage1->expireIn = expireIn->number_;
+  stage1->deviceCode = strdup(deviceCode->string_);
+  stage1->userCode = strdup(userCode->string_);
+  stage1->verificationURL = strdup(verificationUrl->string_);
+  
+  if (!stage1->userCode || !stage1->verificationURL || !stage1->deviceCode) {
+    res = -ENOMEM;
+    goto out_of_memory;
+  }
+
+out_of_memory:
+invalid_response:
+  sjson_destroy_context(sjson);
   return res;
 } 
 
