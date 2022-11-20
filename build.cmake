@@ -25,6 +25,8 @@ set(BUILD_SOURCES
   src/networking/networking.c
   src/parser/sjson.c
   src/io/io_threads.c
+  src/util/circular_buffer.c
+  src/logging/logging.c
 
   deps/vec/vec.c
   deps/buffer/buffer.c
@@ -38,7 +40,7 @@ set(BUILD_INCLUDE_DIRS
   deps/vec/ 
   deps/buffer/ 
   deps/templated-hashmap/ 
-  deps/list/ 
+  deps/list/  
 )
 
 # Note that exe does not represent Windows' 
