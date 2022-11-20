@@ -31,6 +31,12 @@ static int processResponse(struct microsoft_auth_stage1* stage1, char* body, siz
   int res = 0;
   sjson_context* sjson = sjson_create_context(0, 0, NULL);
   sjson_node* root = sjson_decode(sjson, body);
+  if (!root) {
+    pr_critical("Failure parsing server response body");
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
   if (root->tag != SJSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
@@ -41,7 +47,8 @@ static int processResponse(struct microsoft_auth_stage1* stage1, char* body, siz
   sjson_node* verificationUrl = sjson_find_member(root, "verification_uri");
   sjson_node* expireIn = sjson_find_member(root, "expires_in");
   sjson_node* interval = sjson_find_member(root, "interval");
-  if (deviceCode->tag != SJSON_STRING ||
+  if (!deviceCode || !userCode || !verificationUrl || !expireIn || !interval ||
+      deviceCode->tag != SJSON_STRING ||
       userCode->tag != SJSON_STRING ||
       verificationUrl->tag != SJSON_STRING ||
       expireIn->tag != SJSON_NUMBER ||
@@ -52,14 +59,14 @@ static int processResponse(struct microsoft_auth_stage1* stage1, char* body, siz
   
   // `interval` cant be zero as it would mean dont wait between polling
   // which obvious why cant be zero
-  if (interval->number_ <= 0 || interval->number_ > (double) UINT64_MAX ||
+  if (interval->number_ <= 0 || interval->number_ > (double) INT_MAX ||
      expireIn->number_ < 0 || expireIn->number_ > (double) UINT64_MAX) {
     res = -EINVAL;
     goto invalid_response;
   }
   
   stage1->pollInterval = interval->number_;
-  stage1->expireIn = expireIn->number_;
+  stage1->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) expireIn->number_);
   stage1->deviceCode = strdup(deviceCode->string_);
   stage1->userCode = strdup(userCode->string_);
   stage1->verificationURL = strdup(verificationUrl->string_);
@@ -112,7 +119,7 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   size_t responseBodyLen = 0;
   FILE* responseBodyFile = open_memstream(&responseBody, &responseBodyLen);
   if (responseBodyFile == NULL) {
-    pr_error("Failed to open memstream");
+    pr_critical("Failed to open memstream");
     goto memstream_open_failed;
   }
   
@@ -128,7 +135,7 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   
   res = http_response_recv(response, connection, responseBodyFile);
   if (res < 0 || res != 200) {
-    pr_error("Error getting devicecode. Server responseded with %d", res);
+    pr_critical("Error getting devicecode. Server responseded with %d", res);
     goto http_request_recv_error;
   }
   
@@ -139,7 +146,7 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   res = processResponse(self, responseBody, responseBodyLen);
   
   if (res < 0) {
-    pr_error("Processing response failed: %d", res);
+    pr_critical("Processing response failed: %d", res);
     goto process_response_failed;
   }
   pr_notice("Done!");

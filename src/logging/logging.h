@@ -56,7 +56,7 @@ bool logging_has_more_entry();
 #define pr_emerg(fmt, ...) printk(LOG_EMERG pr_fmt("EMERGENCY", fmt __VA_OPT__(,) __VA_ARGS__)) 
 #define pr_alert(fmt, ...) printk(LOG_ALERT pr_fmt("ALERT", fmt __VA_OPT__(,) __VA_ARGS__)) 
 #define pr_critical(fmt, ...) printk(LOG_CRIT pr_fmt("CRITICAL", fmt __VA_OPT__(,) __VA_ARGS__)) 
-#define pr_error(fmt, ...) printk(LOG_ERR pr_fmt("ERR", fmt __VA_OPT__(,) __VA_ARGS__)) 
+#define pr_error(fmt, ...) printk(LOG_ERR pr_fmt("ERROR", fmt __VA_OPT__(,) __VA_ARGS__)) 
 #define pr_warn(fmt, ...) printk(LOG_WARN pr_fmt("WARN", fmt __VA_OPT__(,) __VA_ARGS__)) 
 #define pr_notice(fmt, ...) printk(LOG_NOTICE pr_fmt("NOTICE", fmt __VA_OPT__(,) __VA_ARGS__)) 
 #define pr_info(fmt, ...) printk(LOG_INFO pr_fmt("INFO", fmt __VA_OPT__(,) __VA_ARGS__)) 

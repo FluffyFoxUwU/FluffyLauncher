@@ -15,6 +15,7 @@
 #include "networking/transport/transport_socket.h"
 #include "networking/transport/transport_ssl.h"
 #include "config.h"
+#include "parser/sjson.h"
 #include "util/util.h"
 #include "util/circular_buffer.h"
 
@@ -50,7 +51,7 @@ int main2(int argc, char** argv) {
     .clientID = CONFIG_AUTH_AZURE_CLIENT_ID,
     .tenant = "consumers",
     .hostname = "login.microsoftonline.com",
-    .scope = "XboxLive.signin",
+    .scope = "XboxLive.signin%20offline_access",
     
     .protocol = MICROSOFT_AUTH_HTTPS,
     .port = 443

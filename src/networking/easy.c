@@ -7,15 +7,15 @@
 #include "transport/transport.h"
 #include "transport/transport_socket.h"
 #include "transport/transport_ssl.h"
+#include "logging/logging.h"
 #include "util/util.h"
 
 int networking_easy_new_connection(bool isSecure, const char* hostname, uint16_t port, struct transport** result) {
   int res = 0;
   struct ip_address ip;
   struct transport* transportResult = NULL;
-  int resolveRes = networking_resolve(hostname, &ip, NETWORKING_RESOLVE_PREFER_IPV4);
-  if (resolveRes < 0)
-    return -EFAULT;
+  if ((res = networking_resolve(hostname, &ip, NETWORKING_RESOLVE_PREFER_IPV4)) < 0)
+    goto resolve_error;
   
   ip.port = port;
   
@@ -26,10 +26,8 @@ int networking_easy_new_connection(bool isSecure, const char* hostname, uint16_t
   }
   transportResult = &socketTransport->super;
   
-  if (transport_socket_connect(socketTransport, &ip) < 0) {
-    res = -EFAULT;
+  if ((res = transport_socket_connect(socketTransport, &ip)) < 0) 
     goto connect_error;
-  }
   
   if (!isSecure) {
     transportResult = &socketTransport->super;
@@ -43,10 +41,8 @@ int networking_easy_new_connection(bool isSecure, const char* hostname, uint16_t
   }
   transportResult = &sslTransport->super;
   
-  if (transport_ssl_connect(sslTransport, TRANSPORT_TLS_ANY) < 0) {
-    res = -EFAULT;
+  if ((res = transport_ssl_connect(sslTransport, TRANSPORT_TLS_ANY)) < 0) 
     goto ssl_connect_error;
-  }
   
   if (transport_ssl_verify_host(sslTransport) == false) {
     res = -EFAULT;
@@ -57,9 +53,14 @@ verify_host_error:
 ssl_connect_error: 
 ssl_transport_creation_error:
 connect_error:
-  if (res < 0)
+  if (res < 0) {
     transportResult->close(transportResult);
+    transportResult = NULL;
+  }
 socket_transport_creation_error:
+resolve_error:
+  if (res < 0) 
+    pr_error("Cant connect to %s:%d (Reason: %d)", hostname, port, res);
 ssl_not_needed:
   *result = transportResult;
   return res;

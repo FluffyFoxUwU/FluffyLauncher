@@ -2,7 +2,6 @@
 #define _headers_1667618789_FluffyLauncher_microsoft_auth
 
 #include <stdint.h>
-#include <time.h>
 
 enum microsoft_auth_token_type {
   MICROSOFT_AUTH_TOKEN_BEARER
@@ -16,7 +15,7 @@ enum microsoft_auth_protocol {
 struct microsoft_auth_result {
   enum microsoft_auth_token_type tokenType;
   const char* scope;
-  time_t expiresIn; // In seconds
+  uint64_t expiresTimestamp; 
   const char* accessToken; 
   const char* idToken;
   const char* refreshToken; 

@@ -15,8 +15,8 @@ struct microsoft_auth_stage1 {
   const char* userCode;
   const char* verificationURL;
   
-  uint64_t expireIn;
-  uint64_t pollInterval;
+  uint64_t expireTimestamp;
+  int pollInterval;
 };
 
 struct microsoft_auth_stage1* microsoft_auth_stage1_new(struct microsoft_auth_result* result, struct microsoft_auth_arg* arg);
