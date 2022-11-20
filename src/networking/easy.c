@@ -1,10 +1,13 @@
 #include <errno.h>
 
 #include "easy.h"
+#include "http_headers.h"
+#include "http_request.h"
 #include "networking.h"
 #include "transport/transport.h"
 #include "transport/transport_socket.h"
 #include "transport/transport_ssl.h"
+#include "util/util.h"
 
 int networking_easy_new_connection(bool isSecure, const char* hostname, uint16_t port, struct transport** result) {
   int res = 0;
@@ -60,4 +63,47 @@ socket_transport_creation_error:
 ssl_not_needed:
   *result = transportResult;
   return res;
+}
+
+struct http_request* networking_easy_new_http(int* status, enum http_method method, const char* hostname, const char* location, void* requestBody, size_t requestBodySize, const char* requestBodyType, const char* accept) {
+  struct http_request* req = http_request_new();
+  int res = 0;
+  
+  req->requestData = requestBody;
+  req->requestDataLen = requestBodySize;
+
+  http_request_set_location(req, location);
+  http_request_set_method(req, HTTP_POST);
+  
+  if (requestBody) {
+    char* requestLengthString = NULL;
+    util_asprintf(&requestLengthString, "%zu", requestBodySize);
+    if (requestLengthString == NULL)
+      goto request_preparation_error;
+    
+    res = http_headers_set(req->headers, "Content-Length", requestLengthString);
+    free(requestLengthString);
+    
+    if (res < 0)
+      goto request_preparation_error;
+  }
+  
+  if (accept && (res = http_headers_set(req->headers, "Accept", accept) < 0)) 
+    goto request_preparation_error;
+  
+  if (hostname && (res = http_headers_set(req->headers, "Host", hostname) < 0)) 
+    goto request_preparation_error;
+  
+  if (requestBodyType && (res = http_headers_set(req->headers, "Content-Type", requestBodyType) < 0)) 
+    goto request_preparation_error;
+  
+request_preparation_error:
+  if (res < 0) {
+    http_request_free(req);
+    req = NULL;
+  }
+  
+  if (status)
+    *status = res;
+  return req;
 }

@@ -6,6 +6,7 @@ struct microsoft_auth_stage2* microsoft_auth_stage2_new(struct microsoft_auth_re
   struct microsoft_auth_stage2* self = malloc(sizeof(*self));
   if (!self)
     goto failure;
+  *self = (struct microsoft_auth_stage2) {};
   
   return self;
 

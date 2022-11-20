@@ -26,7 +26,6 @@ int microsoft_auth(struct microsoft_auth_result** resultPtr, struct microsoft_au
   struct microsoft_auth_stage2* stage2 = microsoft_auth_stage2_new(result, arg, stage1);
   if (!stage1) {
     res = -ENOMEM;
-    
     goto stage1_failure;
   }
 

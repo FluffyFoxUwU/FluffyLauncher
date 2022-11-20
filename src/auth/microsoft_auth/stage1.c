@@ -31,14 +31,8 @@ static int processResponse(struct microsoft_auth_stage1* stage1, char* body, siz
 
 int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   int res = 0;
-  struct http_request* req = http_request_new();
-  if (!req) {
-    res = -ENOMEM;
-    goto request_creation_error;
-  }
-  
   struct http_response* response = http_response_new();
-  if (!req) {
+  if (!response) {
     res = -ENOMEM;
     goto response_creation_error;
   }
@@ -57,27 +51,16 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     goto request_body_creation_error;
   }
   
-  char* requestBodyLenString = NULL;
-  util_asprintf(&requestBodyLenString, "%zu", requestBodyLen);
-  if (!requestBodyLenString) {
+  struct http_request* req = networking_easy_new_http(NULL, 
+                                                      HTTP_POST, 
+                                                      self->arg->hostname, location, 
+                                                      requestBody, requestBodyLen, 
+                                                      "application/x-www-form-urlencoded", 
+                                                      "application/json");
+  if (!req) {
     res = -ENOMEM;
-    goto request_body_len_error;
+    goto request_creation_error;
   }
-  
-  http_request_set_location(req, location);
-  http_request_set_method(req, HTTP_POST);
-  
-  if ((res = http_headers_set(req->headers, "Content-Type", "application/x-www-form-urlencoded")) < 0 ||
-      (res = http_headers_set(req->headers, "Content-Length", requestBodyLenString)) < 0 ||
-      (res = http_headers_set(req->headers, "Accept", "application/json")) < 0 ||
-      (res = http_headers_set(req->headers, "Host", self->arg->hostname)) < 0) {
-    BUG_ON(res == -EINVAL);
-    res = -ENOMEM;
-    goto request_preparation_error;
-  }
-  
-  req->requestData = requestBody;
-  req->requestDataLen = requestBodyLen;
   
   char* responseBody = NULL;
   size_t responseBodyLen = 0;
@@ -123,17 +106,14 @@ create_connection_error:
   fclose(responseBodyFile);
   free(responseBody);
 memstream_open_failed:
-request_preparation_error:
-  free(requestBodyLenString);
-request_body_len_error:
   free(requestBody);
+  http_request_free(req);
+request_creation_error:
 request_body_creation_error:
   free(location);
 location_creation_error:
   http_response_free(response);
 response_creation_error:
-  http_request_free(req);
-request_creation_error:
   return res;
 }
 
