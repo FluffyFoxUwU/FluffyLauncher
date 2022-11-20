@@ -72,11 +72,12 @@ int circular_buffer_read(struct circular_buffer* self, void* result, size_t size
   self->readHead %= self->bufferSize;
   pthread_mutex_unlock(&self->lock);
   
+  pthread_cond_broadcast(&self->lockCond);
   return 0;
 }
 
 int circular_buffer_write(struct circular_buffer* self, const void* data, size_t size) {
-  if (size > self->bufferSize - 1)
+  if (size > self->bufferSize - 4)
     return -EOVERFLOW;
   
   pthread_mutex_lock(&self->lock);
@@ -102,6 +103,7 @@ int circular_buffer_write(struct circular_buffer* self, const void* data, size_t
   self->writeHead %= self->bufferSize;
   pthread_mutex_unlock(&self->lock);
   
+  pthread_cond_broadcast(&self->lockCond);
   return 0;
 }
 

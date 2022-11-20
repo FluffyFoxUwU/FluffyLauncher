@@ -61,18 +61,13 @@ static void recordNoLock(const char* msg) {
   BUG_ON(res < 0); 
 }
 
-void logging_puts(const char* msg) {
-  pthread_mutex_lock(&loggingLock);
-  recordNoLock(msg);
-  pthread_mutex_unlock(&loggingLock);
-}
-
 void logging_read_log(struct log_entry* entryPtr) {
   struct log_entry entry;
   
-  pthread_mutex_lock(&loggingLock);
   int res = circular_buffer_read(&circularBuffer, &entry, sizeof(entry));
   BUG_ON(res < 0 || entry.messageLen + 1 > sizeof(emergencyBuffer));
+  
+  pthread_mutex_lock(&loggingLock);
   res = circular_buffer_read(&circularBuffer, emergencyBuffer, entry.messageLen);
   BUG_ON(res < 0);
   
@@ -84,16 +79,15 @@ void logging_read_log(struct log_entry* entryPtr) {
 }
 
 void printk_va(const char* fmt, va_list args) {
-  pthread_mutex_lock(&loggingLock);
-  
   va_list copy;
   va_copy(copy, args);
   size_t len = vsnprintf(NULL, 0, fmt, copy);
   va_end(copy);
   
   BUG_ON(len + 1 > sizeof(emergencyBuffer));
-  vsnprintf(emergencyBuffer, len + 1, fmt, args);
   
+  pthread_mutex_lock(&loggingLock);
+  vsnprintf(emergencyBuffer, len + 1, fmt, args);
   recordNoLock(emergencyBuffer);
   pthread_mutex_unlock(&loggingLock);
 }
@@ -106,5 +100,8 @@ void printk(const char* fmt, ...) {
 }
 
 bool logging_has_more_entry() {
-  return circular_buffer_get_usage(&circularBuffer) > 0;
+  pthread_mutex_lock(&loggingLock);
+  bool res = circular_buffer_get_usage(&circularBuffer) > 0;
+  pthread_mutex_unlock(&loggingLock);
+  return res;
 }

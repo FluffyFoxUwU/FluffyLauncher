@@ -8,7 +8,7 @@
 #include "bug.h"
 #include "networking/transport/transport.h"
 #include "transport_ssl.h"
-#include "util.h"
+#include "util/util.h"
 #include "transport.h"
 
 #define SELF(ptr) container_of(ptr, struct transport_ssl, super)

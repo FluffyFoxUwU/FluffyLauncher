@@ -13,7 +13,7 @@
 #include "transport/transport.h"
 #include "http_request.h"
 #include "hashmap.h"
-#include "util.h"
+#include "util/util.h"
 #include "vec.h"
 
 // TODO: Split this file into smaller chunks

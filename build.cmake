@@ -13,9 +13,9 @@ set(BUILD_MAXIMUM_PERFORMANCE NO)
 
 # Sources which common between exe and library
 set(BUILD_SOURCES
-  src/dummy.c
   src/auth/microsoft_auth.c
-  src/util.c
+  src/auth/microsoft_auth/stage1.c
+  
   src/networking/http_request.c
   src/networking/http_headers.c
   src/networking/http_headers_serializer/normal.c
@@ -23,10 +23,16 @@ set(BUILD_SOURCES
   src/networking/transport/transport_ssl.c
   src/networking/transport/transport.c
   src/networking/networking.c
+  src/networking/easy.c
+ 
+  src/util/circular_buffer.c
+  src/util/util.c
+  
+  src/logging/logging.c
   src/parser/sjson.c
   src/io/io_threads.c
-  src/util/circular_buffer.c
-  src/logging/logging.c
+  
+  src/dummy.c
 
   deps/vec/vec.c
   deps/buffer/buffer.c

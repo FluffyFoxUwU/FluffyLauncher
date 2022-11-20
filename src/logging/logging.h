@@ -8,7 +8,7 @@
 #include <stdbool.h>
 
 #include "compiler_config.h"
-#include "util.h"
+#include "util/util.h"
 
 #define LOG_EMERG "0"
 #define LOG_ALERT "1"
@@ -40,17 +40,11 @@ struct log_entry {
   const char* message;
 };
 
-// Will do emergency abort() if the resulting message was too large
-// emergency abort() should never occured
-// emergency abort() exist because there no way to properly
-// log the error in any helpful way
-void logging_puts(const char* msg);
-
 ATTRIBUTE_PRINTF(1, 2) 
 void printk(const char* fmt, ...);
 void printk_va(const char* fmt, va_list args);
 
-// Read logs
+// Read logs (there can be only no more than one reader)
 // enters critical automaticly
 void logging_read_log(struct log_entry* entry);
 void logging_release_critical();
@@ -65,7 +59,7 @@ bool logging_has_more_entry();
 #define pr_error(fmt, ...) printk(LOG_ERR pr_fmt("ERR", fmt __VA_OPT__(,) __VA_ARGS__)) 
 #define pr_warn(fmt, ...) printk(LOG_WARN pr_fmt("WARN", fmt __VA_OPT__(,) __VA_ARGS__)) 
 #define pr_notice(fmt, ...) printk(LOG_NOTICE pr_fmt("NOTICE", fmt __VA_OPT__(,) __VA_ARGS__)) 
-#define pr_info(fmt, ...) printk(LOG_INFO pr_fmt("NOTICE", fmt __VA_OPT__(,) __VA_ARGS__)) 
+#define pr_info(fmt, ...) printk(LOG_INFO pr_fmt("INFO", fmt __VA_OPT__(,) __VA_ARGS__)) 
 #define pr_debug(fmt, ...) printk(LOG_DEBUG pr_fmt("DEBUG", fmt __VA_OPT__(,) __VA_ARGS__)) 
 
 #endif

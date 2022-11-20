@@ -15,7 +15,7 @@
 #include "networking/transport/transport_socket.h"
 #include "networking/transport/transport_ssl.h"
 #include "config.h"
-#include "util.h"
+#include "util/util.h"
 #include "util/circular_buffer.h"
 
 static atomic_bool shuttingDown = false;
@@ -45,7 +45,6 @@ int main2(int argc, char** argv) {
   pthread_t loggerThread;
   pthread_create(&loggerThread, NULL, logReader, NULL);
   
-  /*
   struct microsoft_auth_result* result = NULL;
   struct microsoft_auth_arg arg = {
     .clientID = CONFIG_AUTH_AZURE_CLIENT_ID,
@@ -60,11 +59,11 @@ int main2(int argc, char** argv) {
   int res = microsoft_auth(&result, &arg);
   printf("Res: %d\n", res);
   microsoft_auth_free(result); 
-  */
   
   pr_info("Shutting down...");
-  pr_info("Shutting down logger thread. Bye!");
+  
   atomic_store(&shuttingDown, true);
+  pr_info("Shutting down logger thread. Bye!");
   pthread_join(loggerThread, NULL);
   
   util_cleanup();
