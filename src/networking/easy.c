@@ -66,7 +66,7 @@ ssl_not_needed:
   return res;
 }
 
-struct http_request* networking_easy_new_http(int* status, enum http_method method, const char* hostname, const char* location, void* requestBody, size_t requestBodySize, const char* requestBodyType, const char* accept) {
+struct http_request* networking_easy_new_http(int* status, enum http_method method, const char* hostname, const char* location, const void* requestBody, size_t requestBodySize, const char* requestBodyType, const char* accept) {
   struct http_request* req = http_request_new();
   int res = 0;
   

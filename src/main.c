@@ -6,6 +6,7 @@
 
 #include "auth/microsoft_auth.h"
 #include "auth/xbox_live_auth.h"
+#include "auth/xsts_auth.h"
 #include "bug.h"
 #include "logging/logging.h"
 #include "networking/http_headers.h"
@@ -49,6 +50,7 @@ int main2(int argc, char** argv) {
   
   struct microsoft_auth_result* microsoftResult = NULL;
   struct xbox_live_auth_result* xboxLiveResult = NULL;
+  struct xsts_auth_result* xstsResult = NULL;
   
   struct microsoft_auth_arg arg = {
     .clientID = CONFIG_AUTH_AZURE_CLIENT_ID,
@@ -61,22 +63,30 @@ int main2(int argc, char** argv) {
     .port = 443
   };
   
+  pr_info("Authenticating with Microsoft...");
   int res = microsoft_auth(&microsoftResult, &arg);
   if (res < 0)
     goto microsoft_auth_failure;
-  
   pr_info("Sucessfully authenticated with Microsoft!"); 
   
+  pr_info("Authenticating with XBoxLive..."); 
   res = xbox_live_auth(microsoftResult->accessToken, &xboxLiveResult);
   if (res < 0)
     goto xbl_auth_failure;
-  
   pr_info("Sucessfully authenticated with XBoxLive!"); 
   
-xbl_auth_failure:
+  pr_info("Authenticating with XSTS..."); 
+  res = xsts_auth(xboxLiveResult->token, &xstsResult);
+  if (res < 0)
+    goto xsts_auth_failure;
+  pr_info("Sucessfully authenticated with XSTS!"); 
+
+  xsts_free(xstsResult);  
+xsts_auth_failure:
   xbox_live_free(xboxLiveResult); 
-microsoft_auth_failure:
+xbl_auth_failure:
   microsoft_auth_free(microsoftResult); 
+microsoft_auth_failure:
   
   pr_info("Shutting down...");
   

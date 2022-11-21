@@ -16,6 +16,9 @@ set(BUILD_SOURCES
   src/auth/microsoft_auth.c
   src/auth/microsoft_auth/stage1.c
   src/auth/microsoft_auth/stage2.c
+  src/auth/xbox_live_auth.c
+  src/auth/xsts_auth.c
+  src/auth/xbl_like_auth.c
   
   src/networking/http_request.c
   src/networking/http_response.c
@@ -35,8 +38,7 @@ set(BUILD_SOURCES
   src/io/io_threads.c
   
   src/dummy.c
-  src/auth/xbox_live_auth.c
-
+  
   deps/vec/vec.c
   deps/buffer/buffer.c
   deps/templated-hashmap/hashmap.c

@@ -34,7 +34,7 @@ struct http_request {
   struct http_headers* headers;
   
   size_t requestDataLen;
-  void* requestData;
+  const void* requestData;
 };
 
 [[nodiscard]]

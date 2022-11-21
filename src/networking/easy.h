@@ -13,7 +13,7 @@ int networking_easy_new_connection(bool isSecure, const char* hostname, uint16_t
 // Conveniencly create and prepare HTTP request
 // status is 0 on success
 // Negative on error
-struct http_request* networking_easy_new_http(int* status, enum http_method method, const char* hostname, const char* location, void* requestBody, size_t requestBodySize, const char* requestBodyType, const char* accept);
+struct http_request* networking_easy_new_http(int* status, enum http_method method, const char* hostname, const char* location, const void* requestBody, size_t requestBodySize, const char* requestBodyType, const char* accept);
 
 #endif
 

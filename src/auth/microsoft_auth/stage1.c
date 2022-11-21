@@ -139,17 +139,13 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     goto http_request_recv_error;
   }
   
-  pr_notice("Success! Response: %d", res);
-  
-  pr_notice("Processing response body...");
   fflush(responseBodyFile);
   res = processResponse(self, responseBody, responseBodyLen);
   
   if (res < 0) {
-    pr_critical("Processing response failed: %d", res);
+    pr_critical("Processing Microsoft authentication server response failed: %d", res);
     goto process_response_failed;
   }
-  pr_notice("Done!");
 
 process_response_failed:
 http_request_recv_error:

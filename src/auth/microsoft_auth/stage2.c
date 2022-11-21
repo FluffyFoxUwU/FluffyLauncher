@@ -75,7 +75,7 @@ static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLe
       goto token_not_ready;
     }
     
-    BUG_ON(strcmp(errorStr, "b ad_verification_code") == 0);
+    BUG_ON(strcmp(errorStr, "bad_verification_code") == 0);
   }
   
   // Mandatory
@@ -92,7 +92,7 @@ static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLe
   }
   
   if (strcmp(tokenType->string_, "Bearer") != 0)
-    pr_error("Returned token type is not Bearer. Proceeding anyway");
+    pr_warn("Returned token type is not Bearer. Proceeding anyway");
   
   // Optional
   sjson_node* refreshToken = sjson_find_member(root, "refresh_token");
@@ -147,13 +147,15 @@ static int tryGetToken(struct microsoft_auth_stage2* self, struct http_request* 
     goto receive_error;
   
   if (res != 200 && res != 400) {
-    pr_error("Authentication server responded with %d (200 or 400 was expected)", res);
+    pr_critical("Authentication server responded with %d (200 or 400 was expected)", res);
     res = -EFAULT;
     goto receive_error;
   }
   
   // Process poll response
   res = process(self, responseBody, responseBodyLen);
+  if (res < 0)
+    pr_critical("Error processing Microsoft authentication server response: %d", res);
 receive_error:
   free(responseBody);
 fail_open_memfd:

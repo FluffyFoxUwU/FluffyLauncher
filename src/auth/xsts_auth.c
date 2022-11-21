@@ -3,12 +3,12 @@
 #include <string.h>
 
 #include "xbl_like_auth.h"
-#include "xbox_live_auth.h"
+#include "xsts_auth.h"
 #include "util/util.h"
 
-int xbox_live_auth(const char* microsoftToken, struct xbox_live_auth_result** result) {
+int xsts_auth(const char* xblToken, struct xsts_auth_result** result) {
   int res = 0;
-  struct xbox_live_auth_result* self = malloc(sizeof(*self));
+  struct xsts_auth_result* self = malloc(sizeof(*self));
   if (!self)
     return -ENOMEM;
   
@@ -16,13 +16,14 @@ int xbox_live_auth(const char* microsoftToken, struct xbox_live_auth_result** re
   util_asprintf(&requestBody, 
 "{ \
   'Properties': { \
-    'AuthMethod': 'RPS',\
-    'SiteName': 'user.auth.xboxlive.com',\
-    'RpsTicket': 'd=%s'\
+    'SandboxId': 'RETAIL', \
+    'UserTokens': [ \
+      '%s' \
+    ] \
   }, \
-  'RelyingParty': 'http://auth.xboxlive.com', \
+  'RelyingParty': 'rp://api.minecraftservices.com/', \
   'TokenType': 'JWT' \
-}", microsoftToken);
+}", xblToken);
 
   if (!requestBody) {
     res = -ENOMEM;
@@ -30,7 +31,7 @@ int xbox_live_auth(const char* microsoftToken, struct xbox_live_auth_result** re
   }
   
   struct xbl_like_auth_result xblLikeAuthResult = {};
-  res = xbl_like_auth("user.auth.xboxlive.com", "/user/authenticate", requestBody, &xblLikeAuthResult);
+  res = xbl_like_auth("xsts.auth.xboxlive.com", "/xsts/authorize", requestBody, &xblLikeAuthResult);
   if (res < 0)
     goto xbl_like_auth_error;
   
@@ -42,11 +43,11 @@ request_body_creation_error:
   if (result)
     *result = self;  
   else
-    xbox_live_free(self);
+    xsts_free(self);
   return res;
 }
 
-void xbox_live_free(struct xbox_live_auth_result* self) {
+void xsts_free(struct xsts_auth_result* self) {
   if (!self)
     return;
   
