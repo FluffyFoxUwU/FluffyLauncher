@@ -15,13 +15,13 @@ int xbox_live_auth(const char* microsoftToken, struct xbox_live_auth_result** re
   char* requestBody = NULL;
   util_asprintf(&requestBody, 
 "{ \
-  'Properties': { \
-    'AuthMethod': 'RPS',\
-    'SiteName': 'user.auth.xboxlive.com',\
-    'RpsTicket': 'd=%s'\
+  \"Properties\": { \
+    \"AuthMethod\": \"RPS\",\
+    \"SiteName\": \"user.auth.xboxlive.com\",\
+    \"RpsTicket\": \"d=%s\"\
   }, \
-  'RelyingParty': 'http://auth.xboxlive.com', \
-  'TokenType': 'JWT' \
+  \"RelyingParty\": \"http://auth.xboxlive.com\", \
+  \"TokenType\": \"JWT\" \
 }", microsoftToken);
 
   if (!requestBody) {
@@ -39,7 +39,7 @@ int xbox_live_auth(const char* microsoftToken, struct xbox_live_auth_result** re
 xbl_like_auth_error:
   free(requestBody);
 request_body_creation_error:
-  if (result)
+  if (result && res >= 0)
     *result = self;  
   else
     xbox_live_free(self);

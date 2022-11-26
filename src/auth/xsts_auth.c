@@ -15,14 +15,14 @@ int xsts_auth(const char* xblToken, struct xsts_auth_result** result) {
   char* requestBody = NULL;
   util_asprintf(&requestBody, 
 "{ \
-  'Properties': { \
-    'SandboxId': 'RETAIL', \
-    'UserTokens': [ \
-      '%s' \
+  \"Properties\": { \
+    \"SandboxId\": \"RETAIL\", \
+    \"UserTokens\": [ \
+      \"%s\" \
     ] \
   }, \
-  'RelyingParty': 'rp://api.minecraftservices.com/', \
-  'TokenType': 'JWT' \
+  \"RelyingParty\": \"rp://api.minecraftservices.com/\", \
+  \"TokenType\": \"JWT\" \
 }", xblToken);
 
   if (!requestBody) {
@@ -40,7 +40,7 @@ int xsts_auth(const char* xblToken, struct xsts_auth_result** result) {
 xbl_like_auth_error:
   free(requestBody);
 request_body_creation_error:
-  if (result)
+  if (result && res >= 0)
     *result = self;  
   else
     xsts_free(self);

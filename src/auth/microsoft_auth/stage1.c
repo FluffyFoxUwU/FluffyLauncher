@@ -84,11 +84,6 @@ invalid_response:
 
 int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   int res = 0;
-  struct http_response* response = http_response_new();
-  if (!response) {
-    res = -ENOMEM;
-    goto response_creation_error;
-  }
   
   char* location = NULL;
   util_asprintf(&location, "/%s/oauth2/v2.0/devicecode", self->arg->tenant);
@@ -115,14 +110,6 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     goto request_creation_error;
   }
   
-  char* responseBody = NULL;
-  size_t responseBodyLen = 0;
-  FILE* responseBodyFile = open_memstream(&responseBody, &responseBodyLen);
-  if (responseBodyFile == NULL) {
-    pr_critical("Failed to open memstream");
-    goto memstream_open_failed;
-  }
-  
   // pr_notice("Getting devicecode at %s:%d/%s", self->arg->hostname, self->arg->port, req->location);
   // Do actual request
   struct transport* connection;
@@ -133,13 +120,22 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   if (res < 0)
     goto http_request_send_error;
   
-  res = http_response_recv(response, connection, responseBodyFile);
+  char* responseBody = NULL;
+  size_t responseBodyLen = 0;
+  FILE* responseBodyFile = open_memstream(&responseBody, &responseBodyLen);
+  if (responseBodyFile == NULL) {
+    pr_critical("Failed to open memstream");
+    goto memstream_open_failed;
+  }
+  
+  res = http_response_recv(NULL, connection, responseBodyFile);
+  fclose(responseBodyFile);
   if (res < 0 || res != 200) {
     pr_critical("Error getting devicecode. Server responseded with %d", res);
     goto http_request_recv_error;
   }
   
-  fflush(responseBodyFile);
+  fclose(responseBodyFile);
   res = processResponse(self, responseBody, responseBodyLen);
   
   if (res < 0) {
@@ -149,20 +145,17 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
 
 process_response_failed:
 http_request_recv_error:
+  free(responseBody);
+memstream_open_failed:
 http_request_send_error:
   connection->close(connection);
 create_connection_error: 
-  fclose(responseBodyFile);
-  free(responseBody);
-memstream_open_failed:
   free(requestBody);
   http_request_free(req);
 request_creation_error:
 request_body_creation_error:
   free(location);
 location_creation_error:
-  http_response_free(response);
-response_creation_error:
   return res;
 }
 

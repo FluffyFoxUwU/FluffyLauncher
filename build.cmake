@@ -17,6 +17,7 @@ set(BUILD_SOURCES
   src/auth/microsoft_auth/stage1.c
   src/auth/microsoft_auth/stage2.c
   src/auth/xbox_live_auth.c
+  src/auth/minecraft_auth.c
   src/auth/xsts_auth.c
   src/auth/xbl_like_auth.c
   

@@ -5,6 +5,7 @@
 #include <stdatomic.h>
 
 #include "auth/microsoft_auth.h"
+#include "auth/minecraft_auth.h"
 #include "auth/xbox_live_auth.h"
 #include "auth/xsts_auth.h"
 #include "bug.h"
@@ -49,8 +50,6 @@ int main2(int argc, char** argv) {
   pthread_create(&loggerThread, NULL, logReader, NULL);
   
   struct microsoft_auth_result* microsoftResult = NULL;
-  struct xbox_live_auth_result* xboxLiveResult = NULL;
-  struct xsts_auth_result* xstsResult = NULL;
   
   struct microsoft_auth_arg arg = {
     .clientID = CONFIG_AUTH_AZURE_CLIENT_ID,
@@ -70,17 +69,28 @@ int main2(int argc, char** argv) {
   pr_info("Sucessfully authenticated with Microsoft!"); 
   
   pr_info("Authenticating with XBoxLive..."); 
+  struct xbox_live_auth_result* xboxLiveResult = NULL;
   res = xbox_live_auth(microsoftResult->accessToken, &xboxLiveResult);
   if (res < 0)
     goto xbl_auth_failure;
   pr_info("Sucessfully authenticated with XBoxLive!"); 
   
   pr_info("Authenticating with XSTS..."); 
+  struct xsts_auth_result* xstsResult = NULL;
   res = xsts_auth(xboxLiveResult->token, &xstsResult);
   if (res < 0)
     goto xsts_auth_failure;
   pr_info("Sucessfully authenticated with XSTS!"); 
 
+  pr_info("Authenticating with Minecraft...");
+  struct minecraft_auth_result* minecraftAuthResult = NULL;
+  res = minecraft_auth(xstsResult->userhash, xstsResult->token, &minecraftAuthResult);
+  if (res < 0)
+    goto minecraft_auth_failed;
+  pr_info("Sucessfully authenticated with Minecraft...");
+
+  minecraft_auth_free(minecraftAuthResult);
+minecraft_auth_failed:
   xsts_free(xstsResult);  
 xsts_auth_failure:
   xbox_live_free(xboxLiveResult); 

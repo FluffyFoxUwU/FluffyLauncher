@@ -1,10 +1,11 @@
-#include "xbl_like_auth.h"
-
+#include <stdint.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 
+#include "xbl_like_auth.h"
 #include "networking/easy.h"
 #include "networking/transport/transport.h"
 #include "xbl_like_auth.h"
@@ -85,7 +86,7 @@ static int processResult401(struct xbl_like_auth_result* self, char* body, size_
   sjson_context* sjson = sjson_create_context(0, 0, NULL);
   sjson_node* root = sjson_decode(sjson, body);
   if (!root) {
-    pr_critical("Failure parsing XBL like server response body for token");
+    pr_critical("Failure parsing XBL like server response body for XErr");
     res = -EINVAL;
     goto invalid_response;
   }
@@ -95,6 +96,36 @@ static int processResult401(struct xbl_like_auth_result* self, char* body, size_
     goto invalid_response;
   }
   
+  sjson_node* xerr = sjson_find_member(root, "XErr");
+  if (!xerr || xerr->tag != SJSON_NUMBER) {
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
+  if (xerr->number_ < 0 || xerr->number_ > (double) UINT64_MAX)  {
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
+  uint64_t xerrInteger = xerr->number_;
+  switch (xerrInteger) {
+    case XBL_LIKE_UNDERAGE:
+      pr_alert("Unable to authenticate: Your account is underage unless added to family by an adult");
+      break;
+    case XBL_LIKE_NO_XBOX_ACOUNT:
+      pr_alert("Unable to authenticate: There is no XBox Live please create one");
+      break;
+    case XBL_LIKE_BANNED_OR_UNAVAILABLE:
+      pr_alert("Unable to authenticate: XBox Live unavailable/banned in your country");
+      break;
+    case XBL_LIKE_REQUIRE_ADULT_VERIFY:
+    case XBL_LIKE_REQUIRE_ADULT_VERIFY2:
+      pr_alert("Unable to authenticate: Adult verification needed (South Korea)");
+      break;
+    default:
+      pr_alert("Unable to authenticate: Unknown XBox error: %" PRIu64, xerrInteger);
+      break;
+  }
 invalid_response:
   sjson_destroy_context(sjson);
   return res;
@@ -104,12 +135,6 @@ int xbl_like_auth(const char* hostname, const char* location, const char* reques
   int res = 0;
   struct xbl_like_auth_result self = (struct xbl_like_auth_result) {};
   
-  struct http_response* response = http_response_new();
-  if (!response) {
-    res = -ENOMEM;
-    goto response_creation_failure;
-  }
-
   struct http_request* req = networking_easy_new_http(&res, 
                                                       HTTP_POST, 
                                                       hostname, 
@@ -120,6 +145,12 @@ int xbl_like_auth(const char* hostname, const char* location, const char* reques
   if (res < 0)
     goto request_creation_failure;
   
+  struct transport* connection;
+  if ((res = networking_easy_new_connection(true, hostname, 443, &connection)) < 0)
+    goto connection_creation_failure;
+  if ((res = http_request_send(req, connection)) < 0)
+    goto request_send_failure;
+  
   char* responseBody = NULL;
   size_t responseBodyLen = 0;
   FILE* memfd = open_memstream(&responseBody, &responseBodyLen);
@@ -127,15 +158,10 @@ int xbl_like_auth(const char* hostname, const char* location, const char* reques
     res = -ENOMEM;
     goto memfd_create_error;
   }
+  res = http_response_recv(NULL, connection, memfd);
+  fclose(memfd);
+  memfd = NULL;
   
-  struct transport* connection;
-  if ((res = networking_easy_new_connection(true, hostname, 443, &connection)) < 0)
-    goto connection_creation_failure;
-  if ((res = http_request_send(req, connection)) < 0)
-    goto request_send_failure;
-  
-  res = http_response_recv(response, connection, memfd);
-  fflush(memfd);
   if (res < 0)
     goto response_recv_failure;
   
@@ -149,17 +175,14 @@ int xbl_like_auth(const char* hostname, const char* location, const char* reques
   if (res < 0)
     pr_critical("Error processing XBL like server response: %d", res);
 response_recv_failure:
+  free(responseBody);
+memfd_create_error:
 request_send_failure:
   connection->close(connection);
-  fclose(memfd);
-  free(responseBody);
   http_request_free(req);
-memfd_create_error:
 request_creation_failure:
-connection_creation_failure:
-  http_response_free(response);
-response_creation_failure:
-  if (result)
+connection_creation_failure: 
+  if (result && res >= 0)
     *result = self;  
   else
     xbl_like_auth_free(&self);

@@ -127,12 +127,6 @@ static int tryGetToken(struct microsoft_auth_stage2* self, struct http_request* 
   if ((res = http_request_send(pollReq, connection)) < 0)
     goto send_request_error;
   
-  struct http_response* response = http_response_new();
-  if (!response) {
-    res = -ENOMEM;
-    goto cannot_allocate_response;
-  }
-  
   char* responseBody = NULL;
   size_t responseBodyLen = 0;
   FILE* responseBodyFile = open_memstream(&responseBody, &responseBodyLen);
@@ -141,7 +135,7 @@ static int tryGetToken(struct microsoft_auth_stage2* self, struct http_request* 
     goto fail_open_memfd;
   }
   
-  res = http_response_recv(response, connection, responseBodyFile);
+  res = http_response_recv(NULL, connection, responseBodyFile);
   fclose(responseBodyFile);
   if (res < 0)
     goto receive_error;
@@ -159,8 +153,6 @@ static int tryGetToken(struct microsoft_auth_stage2* self, struct http_request* 
 receive_error:
   free(responseBody);
 fail_open_memfd:
-  http_response_free(response);
-cannot_allocate_response:
 send_request_error:
   connection->close(connection);
 error_new_connection:

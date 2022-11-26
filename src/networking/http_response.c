@@ -10,19 +10,34 @@
 #include "http_request.h"
 #include "transport/transport.h"
 
-struct http_response* http_response_new() {
-  struct http_response* self = malloc(sizeof(*self));
-  *self = (struct http_response) {};
+static int initResponse(struct http_response* self, bool isStatic) {
+  int res = 0;
+  *self = (struct http_response) {
+    .staticlyAllocated = isStatic
+  };
   
   self->headers = http_headers_new();
-  if (!self->headers) 
-    goto failure;  
+  if (!self->headers) {
+    res = -ENOMEM;
+    goto failure;
+  }
  
-  return self;
-
 failure:
-  http_response_free(self);
+  return res; 
+}
+
+struct http_response* http_response_new() {
+  struct http_response* self = malloc(sizeof(*self));
+  int res = initResponse(self, false);
+  
+  if (res < 0)
+    http_response_free(self);
   return NULL;
+}
+
+int http_response_static_init(struct http_response* self) {
+  self->staticlyAllocated = true;
+  return initResponse(self, true);
 }
 
 void http_response_free(struct http_response* self) {
@@ -31,6 +46,12 @@ void http_response_free(struct http_response* self) {
   
   free((char*) self->description);
   http_headers_free(self->headers);
+  
+  self->description = NULL;
+  self->headers = NULL;
+  
+  if (self->staticlyAllocated)
+    return;
   free(self);
 }
 
@@ -358,29 +379,33 @@ io_error:
   return res;
 }
 
-int http_response_recv(struct http_response* self, struct transport* transport, FILE* writeTo) {
+int http_response_recv(struct http_response* _self, struct transport* transport, FILE* writeTo) {
   int res = 0;
   
+  struct http_response self = {};
+  if ((res = http_response_static_init(&self)) < 0)
+    goto error_init_self;
+  
   // Reading response
-  if ((res = readStatusLine(self, transport)) < 0)
+  if ((res = readStatusLine(&self, transport)) < 0)
     goto read_response_failure;
-  if ((res = readHeaders(self, transport)) < 0)
+  if ((res = readHeaders(&self, transport)) < 0)
     goto read_response_failure;
   
   struct transfer_method_data transferMethodData = {
     .writeTarget = writeTo,
-    .response = self
+    .response = &self
   };
-  enum transfer_method transferMethod = determineTransferMethod(self, &transferMethodData);
+  enum transfer_method transferMethod = determineTransferMethod(&self, &transferMethodData);
   switch (transferMethod) {
     case HTTP_TRANSFER_CHUNKED:
-      res = readChunkedMode(self, transport, &transferMethodData);
+      res = readChunkedMode(&self, transport, &transferMethodData);
       break;
     case HTTP_TRANSFER_BY_CONTENT_LENGTH:
-      res = readByLengthMode(self, transport, &transferMethodData);
+      res = readByLengthMode(&self, transport, &transferMethodData);
       break;
     case HTTP_TRANSFER_UNTIL_CLOSED:
-      res = readUntilClosed(self, transport, &transferMethodData);
+      res = readUntilClosed(&self, transport, &transferMethodData);
       break;
     case HTTP_TRANSFER_UNKNOWN:
       res = -ENOTSUP;
@@ -392,10 +417,17 @@ int http_response_recv(struct http_response* self, struct transport* transport, 
   if (res < 0)
     goto transfer_error;
 
-  res = self->status;
+  res = self.status;
+  if (_self) {
+    self.staticlyAllocated = false;
+    *_self = self;
+  } else { 
+    http_response_free(&self);
+  }
 
 transfer_error: 
 unknown_transfer_method:
 read_response_failure: 
+error_init_self:
   return res;
 }

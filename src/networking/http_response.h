@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 struct transport;
 
@@ -12,9 +13,12 @@ struct http_response {
   size_t writtenSize;
   
   struct http_headers* headers;
+  
+  bool staticlyAllocated;
 };
 
 struct http_response* http_response_new();
+int http_response_static_init(struct http_response* self);
 void http_response_free(struct http_response* self);
 
 // Wait for request result
