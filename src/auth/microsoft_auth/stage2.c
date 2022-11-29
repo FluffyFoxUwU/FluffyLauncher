@@ -168,14 +168,14 @@ static int devicodeAuth(struct microsoft_auth_stage2* self) {
     goto location_creation_error;
   }
   
-  char* requestBody = NULL;
-  size_t requestBodyLen = util_asprintf(&requestBody, "grant_type=urn:ietf:params:oauth:grant-type:device_code&client_id=%s&device_code=%s", self->arg->clientID, self->stage1->deviceCode);
-  if (!requestBody) {
-    res = -ENOMEM;
-    goto request_body_creation_error;
-  }
+  struct http_request* pollRequest;
+  struct easy_http_headers headers[] = {
+    {"Accept", "application/json"},
+    {"Content-Type", "application/x-www-form-urlencoded"},
+    {NULL, NULL}
+  };
   
-  struct http_request* pollRequest = networking_easy_new_http(&res, HTTP_POST, self->arg->hostname, location, requestBody, requestBodyLen, "application/x-www-form-urlencoded", "application/json");  
+  res = networking_easy_new_http(&pollRequest, HTTP_POST, self->arg->hostname, location, headers, "grant_type=urn:ietf:params:oauth:grant-type:device_code&client_id=%s&device_code=%s", self->arg->clientID, self->stage1->deviceCode);  
   if (!pollRequest) 
     goto poll_request_creation_error;
   
@@ -197,10 +197,9 @@ static int devicodeAuth(struct microsoft_auth_stage2* self) {
   }
 
 poll_error:
+  free((char*) pollRequest->requestData);
   http_request_free(pollRequest);
 poll_request_creation_error:
-  free(requestBody);
-request_body_creation_error:
   free(location);
 location_creation_error:
   if (res == -ETIMEDOUT || time(NULL) >= self->stage1->expireTimestamp)
@@ -219,24 +218,22 @@ static int refreshTokenAuth(struct microsoft_auth_stage2* self) {
     goto location_creation_error;
   }
   
-  char* requestBody = NULL;
-  size_t requestBodyLen = util_asprintf(&requestBody, "grant_type=refresh_token&client_id=%s&refresh_token=%s", self->arg->clientID, self->arg->refreshToken);
-  if (!requestBody) {
-    res = -ENOMEM;
-    goto request_body_creation_error;
-  }
-  
-  struct http_request* pollRequest = networking_easy_new_http(&res, HTTP_POST, self->arg->hostname, location, requestBody, requestBodyLen, "application/x-www-form-urlencoded", "application/json");  
-  if (!pollRequest) 
+  struct http_request* pollRequest;
+  struct easy_http_headers headers[] = {
+    {"Accept", "application/json"},
+    {"Content-Type", "application/x-www-form-urlencoded"},
+    {NULL, NULL}
+  };
+  res = networking_easy_new_http(&pollRequest, HTTP_POST, self->arg->hostname, location, headers, "grant_type=refresh_token&client_id=%s&refresh_token=%s", self->arg->clientID, self->arg->refreshToken);  
+  if (res < 0) 
     goto refresh_request_creation_error;
   
   pr_info("Authenticating via refresh token...");
   res = tryGetToken(self, pollRequest);
   
+  free((char*) pollRequest->requestData);
   http_request_free(pollRequest);
 refresh_request_creation_error:
-  free(requestBody);
-request_body_creation_error:
   free(location);
 location_creation_error:
   return res;
@@ -250,6 +247,9 @@ int microsoft_auth_stage2_run(struct microsoft_auth_stage2* self) {
     if (res >= 0)
       return res;
   }
+  
+  if (!self->stage1)
+    return -EINVAL;
   
   return devicodeAuth(self);
 }

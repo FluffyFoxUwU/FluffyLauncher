@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <stdarg.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -143,3 +144,13 @@ const char* util_get_thread_name(pthread_t thread) {
 }
 
 void util_cleanup() {}
+
+// Portable strcasecmp
+int util_strcasecmp(const char* a, const char* b) {
+  while (tolower(*a) == tolower(*b) && *a && *b) {
+    a++;
+    b++;
+  }
+  
+  return (*(a - 1) > *(b - 1)) - (*(a - 1) < *(b - 1));
+}

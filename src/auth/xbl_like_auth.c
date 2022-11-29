@@ -21,19 +21,10 @@ static void xbl_like_auth_free(struct xbl_like_auth_result* self) {
   
   free((char*) self->userhash);
   free((char*) self->token);
-  free(self);
 }
 
-static int processResult200(struct xbl_like_auth_result* self, char* body, size_t bodyLen) {
+static int processResult200(struct xbl_like_auth_result* self, struct sjson_node* root) {
   int res = 0;
-  sjson_context* sjson = sjson_create_context(0, 0, NULL);
-  sjson_node* root = sjson_decode(sjson, body);
-  if (!root) {
-    pr_critical("Failure parsing XBL like server response body for token");
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
   if (root->tag != SJSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
@@ -77,20 +68,11 @@ static int processResult200(struct xbl_like_auth_result* self, char* body, size_
   }
 out_of_memory:
 invalid_response:
-  sjson_destroy_context(sjson);
   return res;
 }
 
-static int processResult401(struct xbl_like_auth_result* self, char* body, size_t bodyLen) {
+static int processResult401(struct xbl_like_auth_result* self, sjson_node* root) {
   int res = 0;
-  sjson_context* sjson = sjson_create_context(0, 0, NULL);
-  sjson_node* root = sjson_decode(sjson, body);
-  if (!root) {
-    pr_critical("Failure parsing XBL like server response body for XErr");
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
   if (root->tag != SJSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
@@ -127,7 +109,6 @@ static int processResult401(struct xbl_like_auth_result* self, char* body, size_
       break;
   }
 invalid_response:
-  sjson_destroy_context(sjson);
   return res;
 }
 
@@ -135,53 +116,36 @@ int xbl_like_auth(const char* hostname, const char* location, const char* reques
   int res = 0;
   struct xbl_like_auth_result self = (struct xbl_like_auth_result) {};
   
-  struct http_request* req = networking_easy_new_http(&res, 
-                                                      HTTP_POST, 
-                                                      hostname, 
-                                                      location, 
-                                                      requestBody, strlen(requestBody), 
-                                                      "application/json", 
-                                                      "application/json");
+  struct easy_http_headers headers[] = {
+    {"Accept", "application/json"},
+    {"Content-Type", "application/json"},
+    {NULL, NULL}
+  };
+  sjson_context* jsonCtx;
+  sjson_node* responseJson;
+  res = networking_easy_do_json_http_rpc(&jsonCtx,
+                                         &responseJson, 
+                                         true,
+                                         HTTP_POST, 
+                                         hostname, 
+                                         location, 
+                                         headers,
+                                         "%s",
+                                         requestBody);
   if (res < 0)
-    goto request_creation_failure;
-  
-  struct transport* connection;
-  if ((res = networking_easy_new_connection(true, hostname, 443, &connection)) < 0)
-    goto connection_creation_failure;
-  if ((res = http_request_send(req, connection)) < 0)
-    goto request_send_failure;
-  
-  char* responseBody = NULL;
-  size_t responseBodyLen = 0;
-  FILE* memfd = open_memstream(&responseBody, &responseBodyLen);
-  if (!memfd) {
-    res = -ENOMEM;
-    goto memfd_create_error;
-  }
-  res = http_response_recv(NULL, connection, memfd);
-  fclose(memfd);
-  memfd = NULL;
-  
-  if (res < 0)
-    goto response_recv_failure;
+    goto request_error;
   
   if (res == 200)
-    res = processResult200(&self, responseBody, responseBodyLen);
+    res = processResult200(&self, responseJson);
   else if (res == 401)
-    res = processResult401(&self, responseBody, responseBodyLen); 
+    res = processResult401(&self, responseJson); 
   else if (res >= 0)
     pr_critical("Unexpected XBL like server responded with %d", res);
+  sjson_destroy_context(jsonCtx);
   
   if (res < 0)
     pr_critical("Error processing XBL like server response: %d", res);
-response_recv_failure:
-  free(responseBody);
-memfd_create_error:
-request_send_failure:
-  connection->close(connection);
-  http_request_free(req);
-request_creation_failure:
-connection_creation_failure: 
+request_error: 
   if (result && res >= 0)
     *result = self;  
   else

@@ -26,6 +26,8 @@ const char* util_get_thread_name(pthread_t thread);
 
 int util_thread_create(pthread_t* newthread, pthread_attr_t* attr, void* (*routine)(void *), void* arg);
 
+int util_strcasecmp(const char* a, const char* b);
+
 // Tiny useful macros from Linux kernel
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define FIELD_SIZEOF(t, f) (sizeof(((t*) NULL)->f))

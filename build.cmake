@@ -21,6 +21,8 @@ set(BUILD_SOURCES
   src/auth/xsts_auth.c
   src/auth/xbl_like_auth.c
   
+  src/minecraft_api/api.c
+  
   src/networking/http_request.c
   src/networking/http_response.c
   src/networking/http_headers.c

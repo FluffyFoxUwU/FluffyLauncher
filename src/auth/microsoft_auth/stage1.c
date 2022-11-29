@@ -27,16 +27,8 @@ failure:
   return NULL;
 }
 
-static int processResponse(struct microsoft_auth_stage1* stage1, char* body, size_t bodyLen) {
+static int processResponse(struct microsoft_auth_stage1* stage1, sjson_node* root) {
   int res = 0;
-  sjson_context* sjson = sjson_create_context(0, 0, NULL);
-  sjson_node* root = sjson_decode(sjson, body);
-  if (!root) {
-    pr_critical("Failure parsing Microsoft server response body for device code");
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
   if (root->tag != SJSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
@@ -78,7 +70,6 @@ static int processResponse(struct microsoft_auth_stage1* stage1, char* body, siz
 
 out_of_memory:
 invalid_response:
-  sjson_destroy_context(sjson);
   return res;
 } 
 
@@ -99,60 +90,33 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     goto request_body_creation_error;
   }
   
-  struct http_request* req = networking_easy_new_http(NULL, 
-                                                      HTTP_POST, 
-                                                      self->arg->hostname, location, 
-                                                      requestBody, requestBodyLen, 
-                                                      "application/x-www-form-urlencoded", 
-                                                      "application/json");
-  if (!req) {
-    res = -ENOMEM;
-    goto request_creation_error;
-  }
+  sjson_context* jsonCtx;
+  sjson_node* responseJson;
+  struct easy_http_headers headers[] = {
+    {"Content-Type", "application/x-www-form-urlencoded"}, 
+    {"Accept", "application/json"},
+    {NULL, NULL}
+  };
+  res = networking_easy_do_json_http_rpc(&jsonCtx,
+                                         &responseJson,
+                                         true, 
+                                         HTTP_POST, 
+                                         self->arg->hostname, location, 
+                                         headers,
+                                         requestBody, requestBodyLen, 
+                                         "client_id=%s&scope=%s", self->arg->clientID, self->arg->scope);
+  if (res < 0)
+    goto request_error;
   
   // pr_notice("Getting devicecode at %s:%d/%s", self->arg->hostname, self->arg->port, req->location);
-  // Do actual request
-  struct transport* connection;
-  if ((res = networking_easy_new_connection(true, self->arg->hostname, self->arg->port, &connection)) < 0) 
-    goto create_connection_error; 
-  
-  res = http_request_send(req, connection);
-  if (res < 0)
-    goto http_request_send_error;
-  
-  char* responseBody = NULL;
-  size_t responseBodyLen = 0;
-  FILE* responseBodyFile = open_memstream(&responseBody, &responseBodyLen);
-  if (responseBodyFile == NULL) {
-    pr_critical("Failed to open memstream");
-    goto memstream_open_failed;
-  }
-  
-  res = http_response_recv(NULL, connection, responseBodyFile);
-  fclose(responseBodyFile);
-  if (res < 0 || res != 200) {
-    pr_critical("Error getting devicecode. Server responseded with %d", res);
-    goto http_request_recv_error;
-  }
-  
-  fclose(responseBodyFile);
-  res = processResponse(self, responseBody, responseBodyLen);
-  
-  if (res < 0) {
+  if ((res = processResponse(self, responseJson)) < 0) {
     pr_critical("Processing Microsoft authentication server response failed: %d", res);
     goto process_response_failed;
   }
 
 process_response_failed:
-http_request_recv_error:
-  free(responseBody);
-memstream_open_failed:
-http_request_send_error:
-  connection->close(connection);
-create_connection_error: 
-  free(requestBody);
-  http_request_free(req);
-request_creation_error:
+  sjson_destroy_context(jsonCtx);
+request_error:
 request_body_creation_error:
   free(location);
 location_creation_error:

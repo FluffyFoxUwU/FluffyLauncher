@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <openssl/ssl.h>
 #include <stdatomic.h>
+#include <errno.h>
+#include <threads.h>
 
 #include "auth/microsoft_auth.h"
 #include "auth/minecraft_auth.h"
@@ -10,6 +12,7 @@
 #include "auth/xsts_auth.h"
 #include "bug.h"
 #include "logging/logging.h"
+#include "minecraft_api/api.h"
 #include "networking/http_headers.h"
 #include "networking/http_request.h"
 #include "io/io_threads.h"
@@ -89,6 +92,19 @@ int main2(int argc, char** argv) {
     goto minecraft_auth_failed;
   pr_info("Sucessfully authenticated with Minecraft...");
 
+  struct minecraft_api* minecraftAPI = minecraft_api_new(minecraftAuthResult->token);
+  if (!minecraftAPI) {
+    res = -ENOMEM;
+    goto minecraft_api_create_failure;
+  }
+  
+  if ((res = minecraft_api_get_profile(minecraftAPI)) < 0)
+    goto fail_to_fetch_profile;
+  
+  pr_info("Logged in as %s (UUID: %s)", minecraftAPI->profile.username, minecraftAPI->profile.uuid);
+fail_to_fetch_profile:
+  minecraft_api_free(minecraftAPI);
+minecraft_api_create_failure:
   minecraft_auth_free(minecraftAuthResult);
 minecraft_auth_failed:
   xsts_free(xstsResult);  

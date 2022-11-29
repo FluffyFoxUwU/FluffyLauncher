@@ -1,3 +1,6 @@
+#include "util/util.h"
+#define sjson_stricmp(a, b) util_strcasecmp(a,b ) 
+
 #include "sjson.h"
 
 /*

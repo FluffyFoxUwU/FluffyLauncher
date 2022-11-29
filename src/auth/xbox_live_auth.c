@@ -11,6 +11,7 @@ int xbox_live_auth(const char* microsoftToken, struct xbox_live_auth_result** re
   struct xbox_live_auth_result* self = malloc(sizeof(*self));
   if (!self)
     return -ENOMEM;
+  *self = (struct xbox_live_auth_result) {};
   
   char* requestBody = NULL;
   util_asprintf(&requestBody, 
