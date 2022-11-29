@@ -74,7 +74,7 @@ int minecraft_auth(const char* userhash, const char* xstsToken, struct minecraft
   if (res < 0)
     pr_critical("Error processing Minecraft services API response: %d", res);
 request_error:
-  if (result && res > 0)
+  if (result && res >= 0)
     *result = self;
   else
     minecraft_auth_free(self);

@@ -30,13 +30,14 @@ struct http_response* http_response_new() {
   struct http_response* self = malloc(sizeof(*self));
   int res = initResponse(self, false);
   
-  if (res < 0)
+  if (res < 0) {
     http_response_free(self);
-  return NULL;
+    return NULL;
+  }
+  return self;
 }
 
 int http_response_static_init(struct http_response* self) {
-  self->staticlyAllocated = true;
   return initResponse(self, true);
 }
 

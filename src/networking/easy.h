@@ -8,6 +8,7 @@
 #include "networking/transport/transport.h"
 #include "parser/sjson.h"
 
+// Only if both key and value is NULL is where its treated end of header list
 struct easy_http_headers {
   const char* key;
   const char* value;
