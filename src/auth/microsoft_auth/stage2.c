@@ -11,13 +11,16 @@
 #include "networking/http_request.h"
 #include "networking/http_response.h"
 #include "networking/transport/transport.h"
+#include "parser/json/decoder.h"
 #include "stage2.h"
 #include "auth/microsoft_auth.h"
 #include "auth/microsoft_auth/stage1.h"
-#include "parser/sjson.h"
+#include "parser/json/json.h"
 #include "util/util.h"
 #include "logging/logging.h"
 #include "networking/easy.h"
+
+// TODO: Modify this file to use networking_easy_do_json_http_rpc for abstraction
 
 struct microsoft_auth_stage2* microsoft_auth_stage2_new(struct microsoft_auth_result* result, struct microsoft_auth_arg* arg, struct microsoft_auth_stage1* stage1) {
   struct microsoft_auth_stage2* self = malloc(sizeof(*self));
@@ -43,27 +46,26 @@ void microsoft_auth_stage2_free(struct microsoft_auth_stage2 *self) {
 
 static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLen) {
   int res = 0;
-  sjson_context* sjson = sjson_create_context(0, 0, NULL);
-  sjson_node* root = sjson_decode(sjson, body);
-  if (!root) {
+  struct json_node* root = NULL;
+  if (json_decode_default(&root, body, bodyLen) < 0) {
     pr_critical("Failure parsing Microsoft server response body for token");
     res = -EINVAL;
     goto invalid_response;
   }
   
-  if (root->tag != SJSON_OBJECT) {
+  if (root->type != JSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  sjson_node* error = sjson_find_member(root, "error");
-  if (error && error->tag != SJSON_STRING) {
+  struct json_node* error;
+  if (json_get_member(root, "error", &error) < 0 && error->type != JSON_STRING) {
     res = -EINVAL;
     goto invalid_response;
   }
   
   if (error) {
-    const char* errorStr = error->string_;
+    const char* errorStr = buffer_string(JSON_STRING(error)->string);
     if (strcmp(errorStr, "authorization_pending") == 0) {
       res = 0;
       goto token_not_ready;
@@ -79,31 +81,33 @@ static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLe
   }
   
   // Mandatory
-  sjson_node* tokenType = sjson_find_member(root, "token_type");
-  sjson_node* expiresIn = sjson_find_member(root, "expires_in");
-  sjson_node* accessToken = sjson_find_member(root, "access_token");
-  if (!tokenType || !expiresIn || !accessToken ||
-      tokenType->tag != SJSON_STRING ||
-      expiresIn->tag != SJSON_NUMBER ||
-      accessToken->tag != SJSON_STRING ||
-      expiresIn->number_ < 0 || expiresIn->number_ >= (double) UINT64_MAX) {
+  struct json_node* tokenType;
+  struct json_node* expiresIn;
+  struct json_node* accessToken;
+  if (json_get_member(root, "token_type", &tokenType) < 0 ||
+      json_get_member(root, "expires_in", &expiresIn) < 0 ||
+      json_get_member(root, "access_token", &accessToken) < 0 ||
+      tokenType->type != JSON_STRING ||
+      expiresIn->type != JSON_NUMBER ||
+      accessToken->type != JSON_STRING ||
+      JSON_NUMBER(expiresIn)->number < 0 || JSON_NUMBER(expiresIn)->number >= (double) UINT64_MAX) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  if (strcmp(tokenType->string_, "Bearer") != 0)
+  if (strcmp(buffer_string(JSON_STRING(tokenType)->string), "Bearer") != 0)
     pr_warn("Returned token type is not Bearer. Proceeding anyway");
   
   // Optional
-  sjson_node* refreshToken = sjson_find_member(root, "refresh_token");
-  if (refreshToken && refreshToken->tag != SJSON_STRING) {
+  struct json_node* refreshToken;  
+  if (json_get_member(root, "refresh_token", &refreshToken) < 0 && refreshToken->type != JSON_STRING) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  self->result->expiresTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) expiresIn->number_);
-  self->result->refreshToken = refreshToken ? strdup(refreshToken->string_) : NULL;
-  self->result->accessToken = strdup(accessToken->string_);
+  self->result->expiresTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) JSON_NUMBER(expiresIn)->number);
+  self->result->refreshToken = refreshToken ? strdup(buffer_string(JSON_STRING(refreshToken)->string)) : NULL;
+  self->result->accessToken = strdup(buffer_string(JSON_STRING(accessToken)->string));
   
   if (!self->result->accessToken || (refreshToken && !self->result->refreshToken)) {
     res = -ENOMEM;
@@ -113,8 +117,8 @@ static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLe
   res = 1;
 out_of_memory:
 token_not_ready:  
-invalid_response:
-  sjson_destroy_context(sjson);
+invalid_response: 
+  json_free(root);
   return res;
 }
 

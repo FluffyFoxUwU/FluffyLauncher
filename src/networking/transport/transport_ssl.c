@@ -115,6 +115,8 @@ connect_failure:
 int transport_ssl_write(struct transport_ssl* self, const void* data, size_t len) {
   if (len > INT_MAX)
     return -E2BIG;
+  if (len == 0)
+    return 0;
   
   int ret = SSL_write(self->priv->ssl, data, len);
   switch (SSL_get_error(self->priv->ssl, ret)) {

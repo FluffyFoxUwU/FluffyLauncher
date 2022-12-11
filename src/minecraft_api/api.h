@@ -1,7 +1,7 @@
 #ifndef _headers_1669520876_FluffyLauncher_api
 #define _headers_1669520876_FluffyLauncher_api
 
-#include "parser/sjson.h"
+#include "parser/json/json.h"
 
 struct minecraft_api_profile {
   const char* uuid;
@@ -10,10 +10,13 @@ struct minecraft_api_profile {
 
 struct minecraft_api {
   const char* token;
+  const char* authorizationValue;
 
   // JSON of last request (remain valid until next call)
-  sjson_context* lastResponseJSON;
+  struct json_node* lastJSON;
+  
   struct minecraft_api_profile profile;
+  struct easy_http_headers* requestHeaders;
 };
 
 struct minecraft_api* minecraft_api_new(const char* token);

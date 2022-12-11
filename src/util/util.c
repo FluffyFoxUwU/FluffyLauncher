@@ -9,6 +9,7 @@
 #include <threads.h>
 #include <string.h>
 
+#include "buffer.h"
 #include "hashmap.h"
 #include "bug.h"
 #include "hashmap_base.h"
@@ -153,4 +154,16 @@ int util_strcasecmp(const char* a, const char* b) {
   }
   
   return (*(a - 1) > *(b - 1)) - (*(a - 1) < *(b - 1));
+}
+
+size_t util_hash_buffer(const buffer_t* buff) {
+  return hashmap_hash_string(buff->data);
+}
+
+int util_compare_buffer(const buffer_t* a, const buffer_t* b) {
+  return strcmp(a->data, b->data);
+}
+
+buffer_t* util_clone_buffer(const buffer_t* buff) {
+  return buffer_new_with_copy(buff->data);
 }

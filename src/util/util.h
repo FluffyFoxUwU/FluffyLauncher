@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#include "buffer.h"
 #include "compiler_config.h"
 
 int util_init();
@@ -27,6 +28,10 @@ const char* util_get_thread_name(pthread_t thread);
 int util_thread_create(pthread_t* newthread, pthread_attr_t* attr, void* (*routine)(void *), void* arg);
 
 int util_strcasecmp(const char* a, const char* b);
+
+size_t util_hash_buffer(const buffer_t* buff);
+int util_compare_buffer(const buffer_t* a, const buffer_t* b);
+buffer_t* util_clone_buffer(const buffer_t* buff);
 
 // Tiny useful macros from Linux kernel
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))

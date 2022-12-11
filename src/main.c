@@ -21,7 +21,7 @@
 #include "networking/transport/transport_socket.h"
 #include "networking/transport/transport_ssl.h"
 #include "config.h"
-#include "parser/sjson.h"
+#include "parser/json/json.h"
 #include "util/util.h"
 #include "util/circular_buffer.h"
 
@@ -31,7 +31,7 @@ static void* logReader(void* v) {
   struct log_entry entry;
   while (!shuttingDown || logging_has_more_entry()) {
     logging_read_log(&entry);
-    printf("[%f] %s\n", entry.timestampInMs, entry.message);
+    fprintf(stderr, "[%f] %s\n", entry.timestampInMs, entry.message);
     logging_release_critical();
   }
   return NULL;
@@ -67,29 +67,37 @@ int main2(int argc, char** argv) {
   
   pr_info("Authenticating with Microsoft...");
   int res = microsoft_auth(&microsoftResult, &arg);
-  if (res < 0)
+  if (res < 0) {
+    pr_error("Fail to authenticate with Microsoft: %d", res);
     goto microsoft_auth_failure;
+  }
   pr_info("Sucessfully authenticated with Microsoft!"); 
   
   pr_info("Authenticating with XBoxLive..."); 
   struct xbox_live_auth_result* xboxLiveResult = NULL;
   res = xbox_live_auth(microsoftResult->accessToken, &xboxLiveResult);
-  if (res < 0)
+  if (res < 0) {
+    pr_error("Fail to authenticate with XBoxLive: %d", res);
     goto xbl_auth_failure;
+  }
   pr_info("Sucessfully authenticated with XBoxLive!"); 
   
   pr_info("Authenticating with XSTS..."); 
   struct xsts_auth_result* xstsResult = NULL;
   res = xsts_auth(xboxLiveResult->token, &xstsResult);
-  if (res < 0)
+  if (res < 0) {
+    pr_error("Fail to authenticate with XSTS: %d", res);
     goto xsts_auth_failure;
+  }
   pr_info("Sucessfully authenticated with XSTS!"); 
 
   pr_info("Authenticating with Minecraft...");
   struct minecraft_auth_result* minecraftAuthResult = NULL;
   res = minecraft_auth(xstsResult->userhash, xstsResult->token, &minecraftAuthResult);
-  if (res < 0)
+  if (res < 0) {
+    pr_error("Fail to authenticate with Minecraft: %d", res);
     goto minecraft_auth_failed;
+  }
   pr_info("Sucessfully authenticated with Minecraft...");
 
   struct minecraft_api* minecraftAPI = minecraft_api_new(minecraftAuthResult->token);
@@ -100,6 +108,7 @@ int main2(int argc, char** argv) {
   
   if ((res = minecraft_api_get_profile(minecraftAPI)) < 0)
     goto fail_to_fetch_profile;
+  pr_info("Sucessfully getting Minecraft profile...");
   
   pr_info("Logged in as %s (UUID: %s)", minecraftAPI->profile.username, minecraftAPI->profile.uuid);
 fail_to_fetch_profile:

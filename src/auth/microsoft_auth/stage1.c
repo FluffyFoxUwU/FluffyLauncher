@@ -2,7 +2,7 @@
 #include <string.h>
 #include <limits.h>
 
-#include "parser/sjson.h"
+#include "parser/json/json.h"
 #include "stage1.h"
 #include "networking/http_request.h"
 #include "networking/http_response.h"
@@ -27,41 +27,45 @@ failure:
   return NULL;
 }
 
-static int processResponse(struct microsoft_auth_stage1* stage1, sjson_node* root) {
+static int processResponse(struct microsoft_auth_stage1* stage1, struct json_node* root) {
   int res = 0;
-  if (root->tag != SJSON_OBJECT) {
+  if (root->type != JSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  sjson_node* deviceCode = sjson_find_member(root, "device_code");
-  sjson_node* userCode = sjson_find_member(root, "user_code");
-  sjson_node* verificationUrl = sjson_find_member(root, "verification_uri");
-  sjson_node* expireIn = sjson_find_member(root, "expires_in");
-  sjson_node* interval = sjson_find_member(root, "interval");
-  if (!deviceCode || !userCode || !verificationUrl || !expireIn || !interval ||
-      deviceCode->tag != SJSON_STRING ||
-      userCode->tag != SJSON_STRING ||
-      verificationUrl->tag != SJSON_STRING ||
-      expireIn->tag != SJSON_NUMBER ||
-      interval->tag != SJSON_NUMBER) {
+  struct json_node* deviceCode;
+  struct json_node* userCode;
+  struct json_node* verificationUrl;
+  struct json_node* expireIn;
+  struct json_node* interval;
+  if (json_get_member(root, "interval", &interval) < 0 ||
+      json_get_member(root, "expires_in", &expireIn) < 0 ||
+      json_get_member(root, "verification_uri", &verificationUrl) < 0 ||
+      json_get_member(root, "user_code", &userCode) < 0 ||
+      json_get_member(root, "device_code", &deviceCode) < 0 ||
+      deviceCode->type != JSON_STRING ||
+      userCode->type != JSON_STRING ||
+      verificationUrl->type != JSON_STRING ||
+      expireIn->type != JSON_NUMBER ||
+      interval->type != JSON_NUMBER) {
     res = -EINVAL;
     goto invalid_response;
   }
   
   // `interval` cant be zero as it would mean dont wait between polling
   // which obvious why cant be zero
-  if (interval->number_ <= 0 || interval->number_ > (double) INT_MAX ||
-     expireIn->number_ < 0 || expireIn->number_ > (double) UINT64_MAX) {
+  if (JSON_NUMBER(interval)->number <= 0 || JSON_NUMBER(interval)->number > (double) INT_MAX ||
+     JSON_NUMBER(expireIn)->number < 0 || JSON_NUMBER(expireIn)->number > (double) UINT64_MAX) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  stage1->pollInterval = interval->number_;
-  stage1->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) expireIn->number_);
-  stage1->deviceCode = strdup(deviceCode->string_);
-  stage1->userCode = strdup(userCode->string_);
-  stage1->verificationURL = strdup(verificationUrl->string_);
+  stage1->pollInterval = JSON_NUMBER(interval)->number;
+  stage1->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) JSON_NUMBER(expireIn)->number);
+  stage1->deviceCode = strdup(buffer_string(JSON_STRING(deviceCode)->string));
+  stage1->userCode = strdup(buffer_string(JSON_STRING(userCode)->string));
+  stage1->verificationURL = strdup(buffer_string(JSON_STRING(verificationUrl)->string));
   
   if (!stage1->userCode || !stage1->verificationURL || !stage1->deviceCode) {
     res = -ENOMEM;
@@ -90,15 +94,13 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     goto request_body_creation_error;
   }
   
-  sjson_context* jsonCtx;
-  sjson_node* responseJson;
+  struct json_node* responseJson;
   struct easy_http_headers headers[] = {
     {"Content-Type", "application/x-www-form-urlencoded"}, 
     {"Accept", "application/json"},
     {NULL, NULL}
   };
-  res = networking_easy_do_json_http_rpc(&jsonCtx,
-                                         &responseJson,
+  res = networking_easy_do_json_http_rpc(&responseJson,
                                          true, 
                                          HTTP_POST, 
                                          self->arg->hostname, location, 
@@ -113,9 +115,9 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     pr_critical("Processing Microsoft authentication server response failed: %d", res);
     goto process_response_failed;
   }
+  json_free(responseJson);
 
 process_response_failed:
-  sjson_destroy_context(jsonCtx);
 request_error:
 request_body_creation_error:
   free(location);

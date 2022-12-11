@@ -6,7 +6,7 @@
 
 #include "http_request.h"
 #include "networking/transport/transport.h"
-#include "parser/sjson.h"
+#include "parser/json/json.h"
 
 // Only if both key and value is NULL is where its treated end of header list
 struct easy_http_headers {
@@ -61,8 +61,7 @@ int networking_easy_do_http(void** response,
                             ...);
 
 // Request is arbitary and response giving out in JSON
-int networking_easy_do_json_http_rpc_va(struct sjson_context** jsonCtx, 
-                                     struct sjson_node** root, 
+int networking_easy_do_json_http_rpc_va(struct json_node** root, 
                                      bool isSecure,
                                      enum http_method method, 
                                      const char* hostname, 
@@ -70,8 +69,7 @@ int networking_easy_do_json_http_rpc_va(struct sjson_context** jsonCtx,
                                      struct easy_http_headers* headers,
                                      const char* requestBodyFormat,
                                      va_list args);
-int networking_easy_do_json_http_rpc(struct sjson_context** jsonCtx, 
-                                     struct sjson_node** root, 
+int networking_easy_do_json_http_rpc(struct json_node** root, 
                                      bool isSecure,
                                      enum http_method method, 
                                      const char* hostname, 

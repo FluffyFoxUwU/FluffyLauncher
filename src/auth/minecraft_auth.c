@@ -3,38 +3,40 @@
 #include <errno.h>
 #include <string.h>
 
+#include "buffer.h"
 #include "minecraft_auth.h"
 #include "networking/easy.h"
 #include "networking/http_response.h"
 #include "networking/http_request.h"
-#include "parser/sjson.h"
+#include "parser/json/json.h"
 #include "logging/logging.h"
 #include "util/util.h"
 
-static int processResult200(struct minecraft_auth_result* self, struct sjson_node* root) {
+static int processResult200(struct minecraft_auth_result* self, struct json_node* root) {
   int res = 0;
   
-  if (root->tag != SJSON_OBJECT) {
+  if (root->type != JSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  sjson_node* token = sjson_find_member(root, "access_token");
-  sjson_node* expireIn = sjson_find_member(root, "expires_in");
-  if (!token || !expireIn ||
-      token->tag != SJSON_STRING ||
-      expireIn->tag != SJSON_NUMBER) {
+  struct json_node* token;
+  struct json_node* expireIn;
+  if (json_get_member(root, "expires_in", &expireIn) < 0 ||
+      json_get_member(root, "access_token", &token) < 0 ||
+      token->type != JSON_STRING ||
+      expireIn->type != JSON_NUMBER) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  if (expireIn->number_ < 0 || expireIn->number_ > (double) UINT64_MAX) {
+  if (JSON_NUMBER(expireIn)->number < 0 || JSON_NUMBER(expireIn)->number > (double) UINT64_MAX) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  self->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) expireIn->number_);
-  self->token = strdup(token->string_);
+  self->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) JSON_NUMBER(expireIn)->number);
+  self->token = strdup(buffer_string(JSON_STRING(token)->string));
   if (!self->token) {
     res = -ENOMEM;
     goto out_of_memory;
@@ -48,16 +50,15 @@ invalid_response:
 int minecraft_auth(const char* userhash, const char* xstsToken, struct minecraft_auth_result** result) {
   int res = 0;
   struct minecraft_auth_result* self = malloc(sizeof(*self));
+  *self = (struct minecraft_auth_result) {};
   
-  sjson_context* jsonContext;
-  sjson_node* responseJSON;
+  struct json_node* responseJSON;
   struct easy_http_headers headers[] = {
     {"Accept", "application/json"},
     {"Content-Type", "application/json"},
     {NULL, NULL}
   };
-  res = networking_easy_do_json_http_rpc(&jsonContext,
-                                         &responseJSON,
+  res = networking_easy_do_json_http_rpc(&responseJSON,
                                          true,
                                          HTTP_POST, 
                                          "api.minecraftservices.com", 
@@ -69,7 +70,7 @@ int minecraft_auth(const char* userhash, const char* xstsToken, struct minecraft
   
   if (res == 200) 
     res = processResult200(self, responseJSON);
-  sjson_destroy_context(jsonContext);
+  json_free(responseJSON);
   
   if (res < 0)
     pr_critical("Error processing Minecraft services API response: %d", res);

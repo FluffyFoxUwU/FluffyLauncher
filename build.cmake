@@ -37,8 +37,9 @@ set(BUILD_SOURCES
   src/util/util.c
   
   src/logging/logging.c
-  src/parser/sjson.c
   src/io/io_threads.c
+  
+  src/parser/json/json.c
   
   src/dummy.c
   
@@ -80,8 +81,8 @@ set(BUILD_PUBLIC_HEADERS
 set(BUILD_PROTOBUF_FILES
 )
 
-set(BUILD_CFLAGS "")
-set(BUILD_LDFLAGS "")
+set(BUILD_CFLAGS "-gdwarf-4")
+set(BUILD_LDFLAGS "-gdwarf-4")
 
 # AddPkgConfigLib is in ./buildsystem/CMakeLists.txt
 macro(AddDependencies)

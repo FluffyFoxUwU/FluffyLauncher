@@ -1,6 +1,8 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "bug.h"
 #include "easy.h"
@@ -9,7 +11,8 @@
 #include "networking.h"
 #include "networking/http_request.h"
 #include "networking/http_response.h"
-#include "parser/sjson.h"
+#include "parser/json/json.h"
+#include "parser/json/decoder.h"
 #include "transport/transport.h"
 #include "transport/transport_socket.h"
 #include "transport/transport_ssl.h"
@@ -79,12 +82,8 @@ int networking_easy_new_http_va(struct http_request** requestPtr, enum http_meth
   req->requestData = NULL;
   req->requestDataLen = 0;
   if (requestBodyFormat) {
-    char* requestData = NULL;
-    size_t requestDataLen = util_vasprintf(&requestData, requestBodyFormat, args);
-    req->requestDataLen = requestDataLen;
-    req->requestData = requestData;
-    
-    if (!requestData)
+    req->requestDataLen = util_vasprintf((char**) &req->requestData, requestBodyFormat, args);
+    if (!req->requestData)
       goto request_body_alloc_error;
     
     char* requestLengthString = NULL;
@@ -145,8 +144,7 @@ int networking_easy_new_http(struct http_request** result,
   return res;
 }
 
-int networking_easy_do_json_http_rpc(struct sjson_context** jsonCtx, 
-                                     struct sjson_node** root, 
+int networking_easy_do_json_http_rpc(struct json_node** root, 
                                      bool isSecure,
                                      enum http_method method, 
                                      const char* hostname, 
@@ -156,7 +154,7 @@ int networking_easy_do_json_http_rpc(struct sjson_context** jsonCtx,
                                      ...) {
   va_list args;
   va_start(args, requestBodyFormat);
-  int res = networking_easy_do_json_http_rpc_va(jsonCtx, root, isSecure, method, hostname, location, headers, requestBodyFormat, args);
+  int res = networking_easy_do_json_http_rpc_va(root, isSecure, method, hostname, location, headers, requestBodyFormat, args);
   va_end(args);
   return res;
 }
@@ -177,8 +175,8 @@ int networking_easy_do_http(void** response,
   return res;
 }
 
-int networking_easy_do_http_va(void** responseBody, 
-                            size_t* responseBodyLength, 
+int networking_easy_do_http_va(void** responseBodyPtr, 
+                            size_t* responseBodyLengthPtr, 
                             bool isSecure,
                             enum http_method method, 
                             const char* hostname, 
@@ -188,17 +186,21 @@ int networking_easy_do_http_va(void** responseBody,
                             va_list args) {
   int res = 0;
   struct http_request* req;
+  char* responseBody = NULL;
+  size_t responseBodyLength = 0;
+  int port = isSecure ? 443 : 80;
+  
   if ((res = networking_easy_new_http_va(&req, method, hostname, location, headers, requestBodyFormat, args)) < 0)
     goto create_request_error;
   
-  FILE* memfd = open_memstream((char**) responseBody, responseBodyLength);
+  FILE* memfd = open_memstream(&responseBody, &responseBodyLength);
   if (!memfd) {
     res = -ENOMEM;
     goto memfd_open_error;
   }
   
   struct transport* connection;
-  if ((res = networking_easy_new_connection(isSecure, hostname, isSecure ? 443 : 80, &connection)) < 0)
+  if ((res = networking_easy_new_connection(isSecure, hostname, port, &connection)) < 0)
     goto connect_error;
   
   if ((res = http_request_send(req, connection)) < 0)
@@ -211,15 +213,29 @@ send_error:
   connection->close(connection);
 connect_error:
   fclose(memfd);
+  if (res < 0)
+    free(responseBody);
 memfd_open_error:
   free((char*) req->requestData);
   http_request_free(req);
 create_request_error:
+  if (res < 0)
+    responseBody = NULL;
+  if (!responseBody)
+    responseBodyLength = 0;
+  
+  // Write back values
+  if (responseBodyPtr)
+    *responseBodyPtr = responseBody;
+  else
+    free(responseBody);
+  
+  if (responseBodyLengthPtr)
+    *responseBodyLengthPtr = responseBodyLength;
   return res;
 }
 
-int networking_easy_do_json_http_rpc_va(struct sjson_context** jsonCtxPtr, 
-                                     struct sjson_node** rootPtr, 
+int networking_easy_do_json_http_rpc_va(struct json_node** rootPtr, 
                                      bool isSecure,
                                      enum http_method method, 
                                      const char* hostname, 
@@ -229,34 +245,25 @@ int networking_easy_do_json_http_rpc_va(struct sjson_context** jsonCtxPtr,
                                      va_list args) {
   void* responseBody = NULL;
   size_t responseBodyLen = 0;
-  sjson_context* ctx = NULL;
-  sjson_node* root = NULL;
+  struct json_node* root = NULL;
   int res = 0;
+
   if ((res = networking_easy_do_http_va(&responseBody, &responseBodyLen, isSecure, method, hostname, location, headers, requestBodyFormat, args)) < 0)
     goto request_error;
-
-  ctx = sjson_create_context(0, 0, NULL);
-  if (!ctx) {
-    res = -ENOMEM;
-    goto fail_to_create_context;
-  }
   
-  root = sjson_decode(ctx, responseBody);
-  if (!root) {
-    pr_error("Failed parsing response from %s://%s/%s", isSecure ? "https" : "http", hostname, location);
+  char* errmsg = NULL;
+  if ((res = json_decode_default(&root, responseBody, responseBodyLen)) < 0) {
+    pr_error("Failed parsing response from '%s://%s/%s': %s (Errno: %d)", isSecure ? "https" : "http", hostname, location, errmsg ? errmsg : "Error message unavailable", res);
+    free(errmsg);
     res = -EFAULT;
     goto fail_parsing;
   }
 
 fail_parsing:
-fail_to_create_context:
   free(responseBody);
 request_error:
-  if (jsonCtxPtr) {
-    *jsonCtxPtr = ctx;
+  if (res >= 0)
     *rootPtr = root;
-  } else {
-    sjson_destroy_context(ctx);
-  }  
+  
   return res;
 }

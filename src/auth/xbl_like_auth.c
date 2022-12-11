@@ -11,7 +11,7 @@
 #include "xbl_like_auth.h"
 #include "networking/http_request.h"
 #include "util/util.h"
-#include "parser/sjson.h"
+#include "parser/json/json.h"
 #include "networking/http_response.h"
 #include "logging/logging.h"
 
@@ -23,45 +23,51 @@ static void xbl_like_auth_free(struct xbl_like_auth_result* self) {
   free((char*) self->token);
 }
 
-static int processResult200(struct xbl_like_auth_result* self, struct sjson_node* root) {
+static int processResult200(struct xbl_like_auth_result* self, struct json_node* root) {
   int res = 0;
-  if (root->tag != SJSON_OBJECT) {
+  if (root->type != JSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  sjson_node* token = sjson_find_member(root, "Token");
-  sjson_node* displayClaims = sjson_find_member(root, "DisplayClaims");
-  if (!token || !displayClaims ||
-       token->tag != SJSON_STRING ||
-       displayClaims->tag != SJSON_OBJECT) {
+  struct json_node* token;
+  struct json_node* displayClaims;
+  if (json_get_member(root, "Token", &token) < 0 ||
+      json_get_member(root, "DisplayClaims", &displayClaims) ||
+       token->type != JSON_STRING ||
+       displayClaims->type != JSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  sjson_node* xui = sjson_find_member(displayClaims, "xui");
-  if (!xui || xui->tag != SJSON_ARRAY) {
+  struct json_node* xui;
+  if (json_get_member(displayClaims, "xui", &xui) < 0 || xui->type != JSON_ARRAY) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  sjson_node* first = sjson_first_child(xui);
-  if (!first || first->tag != SJSON_OBJECT) {
+  if (JSON_ARRAY(xui)->array.length < 1) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  if (first->next)
+  struct json_node* first = JSON_ARRAY(xui)->array.data[0];
+  if (first->type != JSON_OBJECT) {
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
+  if (JSON_ARRAY(xui)->array.length > 2)
     pr_warn("There are more than one entry in $.DisplayClaims.xui array");
   
-  sjson_node* userhash = sjson_find_member(first, "uhs");
-  if (!userhash || userhash->tag != SJSON_STRING) {
+  struct json_node* userhash;
+  if (json_get_member(first, "uhs", &userhash) < 0 || userhash->type != JSON_STRING) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  self->token = strdup(token->string_);
-  self->userhash = strdup(userhash->string_);
+  self->token = strdup(buffer_string(JSON_STRING(token)->string));
+  self->userhash = strdup(buffer_string(JSON_STRING(userhash)->string));
   if (!self->token || !self->userhash) {
     res = -ENOMEM;
     goto out_of_memory;
@@ -71,25 +77,25 @@ invalid_response:
   return res;
 }
 
-static int processResult401(struct xbl_like_auth_result* self, sjson_node* root) {
+static int processResult401(struct xbl_like_auth_result* self, struct json_node* root) {
   int res = 0;
-  if (root->tag != SJSON_OBJECT) {
+  if (root->type != JSON_OBJECT) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  sjson_node* xerr = sjson_find_member(root, "XErr");
-  if (!xerr || xerr->tag != SJSON_NUMBER) {
+  struct json_node* xerr;
+  if (json_get_member(root, "XErr", &xerr) < 0 || xerr->type != JSON_NUMBER) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  if (xerr->number_ < 0 || xerr->number_ > (double) UINT64_MAX)  {
+  if (JSON_NUMBER(xerr)->number < 0 || JSON_NUMBER(xerr)->number > (double) UINT64_MAX)  {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  uint64_t xerrInteger = xerr->number_;
+  uint64_t xerrInteger = JSON_NUMBER(xerr)->number;
   switch (xerrInteger) {
     case XBL_LIKE_UNDERAGE:
       pr_alert("Unable to authenticate: Your account is underage unless added to family by an adult");
@@ -121,10 +127,9 @@ int xbl_like_auth(const char* hostname, const char* location, const char* reques
     {"Content-Type", "application/json"},
     {NULL, NULL}
   };
-  sjson_context* jsonCtx;
-  sjson_node* responseJson;
-  res = networking_easy_do_json_http_rpc(&jsonCtx,
-                                         &responseJson, 
+  
+  struct json_node* responseJson;
+  res = networking_easy_do_json_http_rpc(&responseJson, 
                                          true,
                                          HTTP_POST, 
                                          hostname, 
@@ -141,7 +146,7 @@ int xbl_like_auth(const char* hostname, const char* location, const char* reques
     res = processResult401(&self, responseJson); 
   else if (res >= 0)
     pr_critical("Unexpected XBL like server responded with %d", res);
-  sjson_destroy_context(jsonCtx);
+  json_free(responseJson);
   
   if (res < 0)
     pr_critical("Error processing XBL like server response: %d", res);

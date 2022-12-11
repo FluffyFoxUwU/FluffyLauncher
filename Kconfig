@@ -152,26 +152,58 @@ menu "Local"
       https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app
 endmenu
 
-menu Advanced
-  visible if ADVANCED_MODE
+menu "JSON Decoder and Encoder"
+  config JSON_NEST_MAX
+    int "Nesting limit for JSON"
+    default 200
+    range 10 5000
+    help
+      For avoiding excessive nesting JSON
   
-  config AUTH_LISTEN_PORT  
-    int "Port to listen for redirects"
-    range 1 65536
-    default 3211
+  config JSON_DECODE_MAX_SIZE
+    int "Max size in MiB"
+    default 16
+    range 1 1024
+  
+  config JSON_DECODER_HAS_SELECTED_ONE
+    bool
+  
+  menu Decoders
+    choice
+      prompt "Select default JSON decoder"
+      default JSON_DECODER_DEFAULT_BUILTIN if !JSON_DECODER_HAS_SELECTED_ONE
+      
+      config JSON_DECODER_DEFAULT_BUILTIN
+        bool "Built-in"
+      config JSON_DECODER_DEFAULT_DAVEGAMBLE_CJSON
+        bool "cJSON"
+        depends on JSON_DECODER_HAS_DAVEGAMBLE_CJSON
+    endchoice
     
+    config JSON_DECODER_HAS_DAVEGAMBLE_CJSON 
+      bool "Build in cJSON decoder"
+      select JSON_DECODER_HAS_SELECTED_ONE
+      help
+        See https://github.com/DaveGamble/cJSON
+  endmenu
   
+  menu Encoders
+    config JSON_ENCODER_HAS_SELECTED_ONE
+      bool
+    
+    choice
+      prompt "Select default JSON encoder"
+      default JSON_ENCODER_DEFAULT_BUILTIN if !JSON_ENCODER_HAS_SELECTED_ONE
+      
+      config JSON_ENCODER_DEFAULT_BUILTIN
+        bool "Built-in"
+    endchoice
+  endmenu
 endmenu
 
 config DONT_START_SEPERATE_MAIN_THREAD
   bool "Don't start seperate main thread"
   default n
-
-config ADVANCED_MODE
-  bool "Enable advanced mode"
-  default n
-  help
-    If you dont know what are you doing answer `n`
 
 config TMP_REFRESH_TOKEN
   string "Refresh token"

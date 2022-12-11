@@ -10,6 +10,7 @@
 
 #include "bug.h"
 #include "networking.h"
+#include "logging/logging.h"
 
 static int doResolve(const char* name, struct addrinfo** result) {
   struct addrinfo* lookupResult;
@@ -88,6 +89,9 @@ int networking_resolve(const char* name, struct ip_address* addr, int flags) {
   
   freeaddrinfo(lookupResultList);
 resolve_error:
+  if (res < 0)
+    pr_error("Unable to resolve %s: %d", name, res);
+  
   if (addr)
     *addr = result;
   return res;
