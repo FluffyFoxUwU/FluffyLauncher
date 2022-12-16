@@ -1,3 +1,6 @@
 [submodule "buildsystem"]
 	path = buildsystem
 	url = https://github.com/FluffyFoxUwU/common-cmake
+[submodule "src/submodules/cJSON"]
+	path = src/submodules/cJSON
+	url = https://github.com/DaveGamble/cJSON/
