@@ -153,35 +153,24 @@ menu "Local"
 endmenu
 
 menu "JSON Decoder and Encoder"
-  config JSON_NEST_MAX
-    int "Nesting limit for JSON"
-    default 200
-    range 10 5000
-    help
-      For avoiding excessive nesting JSON
-  
-  config JSON_DECODE_MAX_SIZE
-    int "Max size in MiB"
-    default 16
-    range 1 1024
-  
-  config JSON_DECODER_HAS_SELECTED_ONE
-    bool
-  
   menu Decoders
+    config JSON_DECODER_HAS_SELECTED_ONE
+      bool
+    
     choice
       prompt "Select default JSON decoder"
       default JSON_DECODER_DEFAULT_BUILTIN if !JSON_DECODER_HAS_SELECTED_ONE
       
-      config JSON_DECODER_DEFAULT_BUILTIN
-        bool "Built-in"
+      #config JSON_DECODER_DEFAULT_BUILTIN
+      #  bool "Built-in"
       config JSON_DECODER_DEFAULT_DAVEGAMBLE_CJSON
         bool "cJSON"
         depends on JSON_DECODER_HAS_DAVEGAMBLE_CJSON
     endchoice
     
     config JSON_DECODER_HAS_DAVEGAMBLE_CJSON 
-      bool "Build in cJSON decoder"
+      def_bool y
+      #"Build in cJSON decoder"
       select JSON_DECODER_HAS_SELECTED_ONE
       help
         See https://github.com/DaveGamble/cJSON
@@ -199,6 +188,18 @@ menu "JSON Decoder and Encoder"
         bool "Built-in"
     endchoice
   endmenu
+  
+  config JSON_NEST_MAX
+    int "Nesting limit for JSON"
+    default 200
+    range 1 5000
+    help
+      For avoiding excessive nesting JSON
+  
+  config JSON_DECODE_MAX_SIZE
+    int "Max size in MiB (0 for unlimited)"
+    default 16
+    range 0 1024
 endmenu
 
 config DONT_START_SEPERATE_MAIN_THREAD

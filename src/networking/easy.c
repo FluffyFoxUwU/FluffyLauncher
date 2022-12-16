@@ -252,8 +252,9 @@ int networking_easy_do_json_http_rpc_va(struct json_node** rootPtr,
     goto request_error;
   
   char* errmsg = NULL;
-  if ((res = json_decode_default(&root, responseBody, responseBodyLen)) < 0) {
-    pr_error("Failed parsing response from '%s://%s/%s': %s (Errno: %d)", isSecure ? "https" : "http", hostname, location, errmsg ? errmsg : "Error message unavailable", res);
+  int decodeRes;
+  if ((decodeRes = json_decode_default(&root, responseBody, responseBodyLen)) < 0) {
+    pr_error("Failed parsing response from '%s://%s/%s': %s (Errno: %d)", isSecure ? "https" : "http", hostname, location, errmsg ? errmsg : "Error message unavailable", decodeRes);
     free(errmsg);
     res = -EFAULT;
     goto fail_parsing;

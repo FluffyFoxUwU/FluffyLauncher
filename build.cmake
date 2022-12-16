@@ -40,8 +40,13 @@ set(BUILD_SOURCES
   src/io/io_threads.c
   
   src/parser/json/json.c
+  src/parser/json/decoder/builtin.c
+  src/parser/json/decoder/cjson.c
+  src/parser/json/decoder.c
   
   src/dummy.c
+  
+  src/submodules/cJSON/cJSON.c
   
   deps/vec/vec.c
   deps/buffer/buffer.c

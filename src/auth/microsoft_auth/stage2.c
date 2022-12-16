@@ -58,13 +58,15 @@ static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLe
     goto invalid_response;
   }
   
-  struct json_node* error;
-  if (json_get_member(root, "error", &error) < 0 && error->type != JSON_STRING) {
+  struct json_node* error = NULL;
+  int getRes = json_get_member(root, "error", &error);
+  if (getRes != -ENODATA && (getRes < 0 || error->type != JSON_STRING)) {
     res = -EINVAL;
     goto invalid_response;
   }
   
   if (error) {
+    printk("err: %p\n", error);
     const char* errorStr = buffer_string(JSON_STRING(error)->string);
     if (strcmp(errorStr, "authorization_pending") == 0) {
       res = 0;
@@ -100,7 +102,8 @@ static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLe
   
   // Optional
   struct json_node* refreshToken;  
-  if (json_get_member(root, "refresh_token", &refreshToken) < 0 && refreshToken->type != JSON_STRING) {
+  getRes = json_get_member(root, "refresh_token", &refreshToken);
+  if (getRes != -ENODATA && (getRes < 0 || refreshToken->type != JSON_STRING)) {
     res = -EINVAL;
     goto invalid_response;
   }
