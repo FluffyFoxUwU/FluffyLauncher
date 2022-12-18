@@ -138,7 +138,15 @@ menu General
   endchoice
 endmenu
 
-menu "Local"
+menu "Local Default"
+  config MINECRAFT_API_HOSTNAME
+    string "Hostname to Minecraft API"
+    default "api.minecraftservices.com"
+  
+  config MICROSOFT_LOGIN_HOSTNAME
+    string "Hostname to Microsoft login API"
+    default "login.microsoftonline.com"
+  
   config AUTH_AZURE_CLIENT_ID
     string "Azure client application ID"
     default "<unset>"

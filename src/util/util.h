@@ -4,6 +4,8 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "buffer.h"
 #include "compiler_config.h"
@@ -32,6 +34,24 @@ int util_strcasecmp(const char* a, const char* b);
 size_t util_hash_buffer(const buffer_t* buff);
 int util_compare_buffer(const buffer_t* a, const buffer_t* b);
 buffer_t* util_clone_buffer(const buffer_t* buff);
+
+void util_usleep(uint32_t microsecs);
+void util_msleep(uint32_t milisecs);
+void util_nanosleep(uint64_t nanosecs);
+
+double util_get_realtime();
+
+#define util_microsec_to_timespec_ptr(t) (struct timespec*) {&(struct timespec) { \
+  .tv_sec = (t) / 1000000, \
+  .tv_nsec = (t * 1000) % 1000000000 \
+}}
+
+#define util_milisec_to_timespec_ptr(t) (struct timespec*) {&(struct timespec) { \
+  .tv_sec = (t) / 1000, \
+  .tv_nsec = ((t) * 1000000) % 1000000000 \
+}}
+
+#define is_same_type(a, b) _Generic((a), b: true, default: false)
 
 // Tiny useful macros from Linux kernel
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))

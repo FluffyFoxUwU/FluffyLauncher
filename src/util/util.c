@@ -1,6 +1,7 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -8,6 +9,7 @@
 #include <stdatomic.h>
 #include <threads.h>
 #include <string.h>
+#include <time.h>
 
 #include "buffer.h"
 #include "hashmap.h"
@@ -166,4 +168,33 @@ int util_compare_buffer(const buffer_t* a, const buffer_t* b) {
 
 buffer_t* util_clone_buffer(const buffer_t* buff) {
   return buffer_new_with_copy(buff->data);
+}
+
+void util_msleep(uint32_t milisecs) {
+  util_usleep(milisecs * 1000);
+}
+
+void util_usleep(uint32_t microsecs) {
+  util_nanosleep(microsecs * 1000);
+}
+
+void util_nanosleep(uint64_t nanosecs) {
+  struct timespec rem = {};
+  struct timespec req = {
+    .tv_nsec = nanosecs % 1000000000,
+    .tv_sec = nanosecs / 1000000000
+  };
+  
+  int res = 0;
+  while ((res = nanosleep(&req, &rem)) == -EINTR) {
+    req = rem;
+    rem = (struct timespec) {};
+  }
+  BUG_ON(res == -EINVAL);
+}
+
+double util_get_realtime() {
+  struct timespec timespec;
+  clock_gettime(CLOCK_REALTIME, &timespec);
+  return (double) timespec.tv_sec + ((double) timespec.tv_nsec / (double) 1000000000);
 }

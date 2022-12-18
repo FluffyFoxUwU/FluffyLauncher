@@ -4,12 +4,14 @@
 #include <openssl/ssl.h>
 #include <stdatomic.h>
 #include <errno.h>
+#include <string.h>
 #include <threads.h>
 
 #include "auth/microsoft_auth.h"
 #include "auth/minecraft_auth.h"
 #include "auth/xbox_live_auth.h"
 #include "auth/xsts_auth.h"
+#include "buffer.h"
 #include "bug.h"
 #include "logging/logging.h"
 #include "minecraft_api/api.h"
@@ -21,6 +23,8 @@
 #include "networking/transport/transport_socket.h"
 #include "networking/transport/transport_ssl.h"
 #include "config.h"
+#include "parser/json/decoder.h"
+#include "util/json_schema_loader.h"
 #include "parser/json/json.h"
 #include "util/util.h"
 #include "util/circular_buffer.h"
@@ -31,8 +35,7 @@ static void* logReader(void* v) {
   struct log_entry entry;
   while (!shuttingDown || logging_has_more_entry()) {
     logging_read_log(&entry);
-    fprintf(stderr, "[%f] %s\n", entry.timestampInMs, entry.message);
-    logging_release_critical();
+    fprintf(stderr, "[%f] %s\n", entry.realtime, entry.message);
   }
   return NULL;
 }
@@ -57,7 +60,7 @@ int main2(int argc, char** argv) {
   struct microsoft_auth_arg arg = {
     .clientID = CONFIG_AUTH_AZURE_CLIENT_ID,
     .tenant = "consumers",
-    .hostname = "login.microsoftonline.com",
+    .hostname = CONFIG_MICROSOFT_LOGIN_HOSTNAME,
     .scope = "XboxLive.signin%20offline_access",
     .refreshToken = CONFIG_TMP_REFRESH_TOKEN,
     
@@ -110,7 +113,7 @@ int main2(int argc, char** argv) {
     goto fail_to_fetch_profile;
   pr_info("Sucessfully getting Minecraft profile...");
   
-  pr_info("Logged in as %s (UUID: %s)", minecraftAPI->profile.username, minecraftAPI->profile.uuid);
+  pr_info("Logged in as %s (UUID: %s)", minecraftAPI->callResult.profile.username, minecraftAPI->callResult.profile.uuid);
 fail_to_fetch_profile:
   minecraft_api_free(minecraftAPI);
 minecraft_api_create_failure:

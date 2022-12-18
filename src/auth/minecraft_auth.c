@@ -5,38 +5,41 @@
 
 #include "buffer.h"
 #include "minecraft_auth.h"
+#include "config.h"
 #include "networking/easy.h"
 #include "networking/http_response.h"
 #include "networking/http_request.h"
 #include "parser/json/json.h"
 #include "logging/logging.h"
+#include "util/json_schema_loader.h"
 #include "util/util.h"
+
+struct minecraft_auth_response {
+  double expiresIn;
+  buffer_t* token;
+};
+
+static const struct json_schema minecraftAuthResponseSchema = {
+  .entries = {
+    JSON_SCHEMA_ENTRY("$.expires_in", JSON_NUMBER, struct minecraft_auth_response, expiresIn),
+    JSON_SCHEMA_ENTRY("$.access_token", JSON_STRING, struct minecraft_auth_response, token),
+    {}
+  }
+};
 
 static int processResult200(struct minecraft_auth_result* self, struct json_node* root) {
   int res = 0;
+  struct minecraft_auth_response response = {};
+  if ((res = json_schema_load(&minecraftAuthResponseSchema, root, &response)) < 0)
+    goto invalid_response;
   
-  if (root->type != JSON_OBJECT) {
+  if (response.expiresIn < 0 || response.expiresIn > (double) UINT64_MAX) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  struct json_node* token;
-  struct json_node* expireIn;
-  if (json_get_member(root, "expires_in", &expireIn) < 0 ||
-      json_get_member(root, "access_token", &token) < 0 ||
-      token->type != JSON_STRING ||
-      expireIn->type != JSON_NUMBER) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  if (JSON_NUMBER(expireIn)->number < 0 || JSON_NUMBER(expireIn)->number > (double) UINT64_MAX) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  self->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) JSON_NUMBER(expireIn)->number);
-  self->token = strdup(buffer_string(JSON_STRING(token)->string));
+  self->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) response.expiresIn);
+  self->token = strdup(buffer_string(response.token));
   if (!self->token) {
     res = -ENOMEM;
     goto out_of_memory;
@@ -61,7 +64,7 @@ int minecraft_auth(const char* userhash, const char* xstsToken, struct minecraft
   res = networking_easy_do_json_http_rpc(&responseJSON,
                                          true,
                                          HTTP_POST, 
-                                         "api.minecraftservices.com", 
+                                         CONFIG_MINECRAFT_API_HOSTNAME, 
                                          "/authentication/login_with_xbox",
                                          headers,
                                          "{\"identityToken\": \"XBL3.0 x=%s;%s\"}", userhash, xstsToken);

@@ -6,8 +6,10 @@
 #include <string.h>
 
 #include "xbl_like_auth.h"
+#include "buffer.h"
 #include "networking/easy.h"
 #include "networking/transport/transport.h"
+#include "util/json_schema_loader.h"
 #include "xbl_like_auth.h"
 #include "networking/http_request.h"
 #include "util/util.h"
@@ -23,51 +25,32 @@ static void xbl_like_auth_free(struct xbl_like_auth_result* self) {
   free((char*) self->token);
 }
 
+struct xbl_like_200_response {
+  buffer_t* token;
+  buffer_t* userhash;
+  struct json_array* displayclaims_xui;
+};
+
+static const struct json_schema xblLike200ResponseSchema = {
+  .entries = {
+    JSON_SCHEMA_ENTRY("$.Token", JSON_STRING, struct xbl_like_200_response, token),
+    JSON_SCHEMA_ENTRY("$.DisplayClaims.xui[0].uhs", JSON_STRING, struct xbl_like_200_response, userhash),
+    JSON_SCHEMA_ENTRY("$.DisplayClaims.xui", JSON_ARRAY, struct xbl_like_200_response, displayclaims_xui),
+    {}
+  }
+};
+
 static int processResult200(struct xbl_like_auth_result* self, struct json_node* root) {
   int res = 0;
-  if (root->type != JSON_OBJECT) {
-    res = -EINVAL;
+  struct xbl_like_200_response response = {};
+  if ((res = json_schema_load(&xblLike200ResponseSchema, root, &response)) < 0)
     goto invalid_response;
-  }
   
-  struct json_node* token;
-  struct json_node* displayClaims;
-  if (json_get_member(root, "Token", &token) < 0 ||
-      json_get_member(root, "DisplayClaims", &displayClaims) ||
-       token->type != JSON_STRING ||
-       displayClaims->type != JSON_OBJECT) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  struct json_node* xui;
-  if (json_get_member(displayClaims, "xui", &xui) < 0 || xui->type != JSON_ARRAY) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  if (JSON_ARRAY(xui)->array.length < 1) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  struct json_node* first = JSON_ARRAY(xui)->array.data[0];
-  if (first->type != JSON_OBJECT) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  if (JSON_ARRAY(xui)->array.length > 2)
+  if (response.displayclaims_xui->array.length >= 2)
     pr_warn("There are more than one entry in $.DisplayClaims.xui array");
   
-  struct json_node* userhash;
-  if (json_get_member(first, "uhs", &userhash) < 0 || userhash->type != JSON_STRING) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  self->token = strdup(buffer_string(JSON_STRING(token)->string));
-  self->userhash = strdup(buffer_string(JSON_STRING(userhash)->string));
+  self->token = strdup(buffer_string(response.token));
+  self->userhash = strdup(buffer_string(response.userhash));
   if (!self->token || !self->userhash) {
     res = -ENOMEM;
     goto out_of_memory;
@@ -77,6 +60,17 @@ invalid_response:
   return res;
 }
 
+struct xbl_like_401_response {
+  double xerr;
+};
+
+static const struct json_schema xblLike401ResponseSchema = {
+  .entries = {
+    JSON_SCHEMA_ENTRY("$.XErr", JSON_NUMBER, struct xbl_like_401_response, xerr),
+    {}
+  }
+};
+
 static int processResult401(struct xbl_like_auth_result* self, struct json_node* root) {
   int res = 0;
   if (root->type != JSON_OBJECT) {
@@ -84,19 +78,16 @@ static int processResult401(struct xbl_like_auth_result* self, struct json_node*
     goto invalid_response;
   }
   
-  struct json_node* xerr;
-  if (json_get_member(root, "XErr", &xerr) < 0 || xerr->type != JSON_NUMBER) {
+  struct xbl_like_401_response response = {};
+  if ((res = json_schema_load(&xblLike401ResponseSchema, root, &response)) < 0)
+    goto invalid_response;
+  
+  if (response.xerr < 0 || response.xerr > (double) UINT64_MAX)  {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  if (JSON_NUMBER(xerr)->number < 0 || JSON_NUMBER(xerr)->number > (double) UINT64_MAX)  {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  uint64_t xerrInteger = JSON_NUMBER(xerr)->number;
-  switch (xerrInteger) {
+  switch ((uint64_t) response.xerr) {
     case XBL_LIKE_UNDERAGE:
       pr_alert("Unable to authenticate: Your account is underage unless added to family by an adult");
       break;
@@ -111,7 +102,7 @@ static int processResult401(struct xbl_like_auth_result* self, struct json_node*
       pr_alert("Unable to authenticate: Adult verification needed (South Korea)");
       break;
     default:
-      pr_alert("Unable to authenticate: Unknown XBox error: %" PRIu64, xerrInteger);
+      pr_alert("Unable to authenticate: Unknown XBox error: %" PRIu64, (uint64_t) response.xerr);
       break;
   }
 invalid_response:

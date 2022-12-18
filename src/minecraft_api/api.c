@@ -4,11 +4,14 @@
 #include <errno.h>
 
 #include "api.h"
+#include "buffer.h"
 #include "networking/easy.h"
 #include "networking/http_request.h"
 #include "parser/json/json.h"
 #include "util/util.h"
 #include "logging/logging.h"
+#include "schema.h"
+#include "config.h"
 
 static void cleanLastCall(struct minecraft_api* self) {
   if (self->lastJSON)
@@ -49,11 +52,18 @@ int minecraft_api_get_profile(struct minecraft_api* self) {
   cleanLastCall(self);
   int res = 0;
   
-  if ((res = networking_easy_do_json_http_rpc(&self->lastJSON, true, HTTP_GET, "api.minecraftservices.com", "/minecraft/profile", self->requestHeaders, "")) < 0)
+  if ((res = networking_easy_do_json_http_rpc(&self->lastJSON, true, HTTP_GET, CONFIG_MINECRAFT_API_HOSTNAME, "/minecraft/profile", self->requestHeaders, "")) < 0)
     goto send_request_error;
 
+  struct minecraft_api_profile_raw profile = {};
+  
+  if ((res = minecraft_api_response_parse_profile(self->lastJSON, &profile)) < 0)
+    goto invalid_response;
+  
+  self->callResult.profile.username = buffer_string(profile.name);
+  self->callResult.profile.uuid = buffer_string(profile.id);
+invalid_response:
 send_request_error:
-  pr_info("Error: %d", res);
   return res;
 }
 

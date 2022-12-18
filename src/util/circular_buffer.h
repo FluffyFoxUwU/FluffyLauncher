@@ -51,5 +51,11 @@ bool circular_buffer_is_full(struct circular_buffer* self);
 bool circular_buffer_is_empty(struct circular_buffer* self);
 size_t circular_buffer_get_usage(struct circular_buffer* self);
 
+// Polls every 1 ms and check
+// Return miliseconds left or -ETIMEDOUT on timeout
+// could return 0 incase its empty/full at same ms when time out happens
+int circular_buffer_wait_until_empty(struct circular_buffer* self, int maxMs);
+int circular_buffer_wait_until_full(struct circular_buffer* self, int maxMs);
+
 #endif
 

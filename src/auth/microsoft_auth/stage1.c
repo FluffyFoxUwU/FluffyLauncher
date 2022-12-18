@@ -2,11 +2,13 @@
 #include <string.h>
 #include <limits.h>
 
+#include "buffer.h"
 #include "parser/json/json.h"
 #include "stage1.h"
 #include "networking/http_request.h"
 #include "networking/http_response.h"
 #include "networking/http_headers.h"
+#include "util/json_schema_loader.h"
 #include "util/util.h"
 #include "bug.h"
 #include "logging/logging.h"
@@ -27,45 +29,44 @@ failure:
   return NULL;
 }
 
+struct stage1_response {
+  double interval;
+  double expiresIn;
+  buffer_t* verificationURL;
+  buffer_t* userCode;
+  buffer_t* deviceCode;
+};
+
+static struct json_schema stage1ResponseSchema = {
+  .entries = {
+    JSON_SCHEMA_ENTRY("$.interval", JSON_NUMBER, struct stage1_response, interval),
+    JSON_SCHEMA_ENTRY("$.expires_in", JSON_NUMBER, struct stage1_response, expiresIn),
+    JSON_SCHEMA_ENTRY("$.verification_uri", JSON_STRING, struct stage1_response, verificationURL),
+    JSON_SCHEMA_ENTRY("$.user_code", JSON_STRING, struct stage1_response, userCode),
+    JSON_SCHEMA_ENTRY("$.device_code", JSON_STRING, struct stage1_response, deviceCode),
+    {}
+  }
+};
+
 static int processResponse(struct microsoft_auth_stage1* stage1, struct json_node* root) {
   int res = 0;
-  if (root->type != JSON_OBJECT) {
-    res = -EINVAL;
+  struct stage1_response response = {};
+  if ((res = json_schema_load(&stage1ResponseSchema, root, &response)) < 0)
     goto invalid_response;
-  }
-  
-  struct json_node* deviceCode;
-  struct json_node* userCode;
-  struct json_node* verificationUrl;
-  struct json_node* expireIn;
-  struct json_node* interval;
-  if (json_get_member(root, "interval", &interval) < 0 ||
-      json_get_member(root, "expires_in", &expireIn) < 0 ||
-      json_get_member(root, "verification_uri", &verificationUrl) < 0 ||
-      json_get_member(root, "user_code", &userCode) < 0 ||
-      json_get_member(root, "device_code", &deviceCode) < 0 ||
-      deviceCode->type != JSON_STRING ||
-      userCode->type != JSON_STRING ||
-      verificationUrl->type != JSON_STRING ||
-      expireIn->type != JSON_NUMBER ||
-      interval->type != JSON_NUMBER) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
   
   // `interval` cant be zero as it would mean dont wait between polling
   // which obvious why cant be zero
-  if (JSON_NUMBER(interval)->number <= 0 || JSON_NUMBER(interval)->number > (double) INT_MAX ||
-     JSON_NUMBER(expireIn)->number < 0 || JSON_NUMBER(expireIn)->number > (double) UINT64_MAX) {
+  if (response.interval <= 0 || response.interval > (double) INT_MAX ||
+     response.expiresIn < 0 || response.expiresIn > (double) UINT64_MAX) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  stage1->pollInterval = JSON_NUMBER(interval)->number;
-  stage1->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) JSON_NUMBER(expireIn)->number);
-  stage1->deviceCode = strdup(buffer_string(JSON_STRING(deviceCode)->string));
-  stage1->userCode = strdup(buffer_string(JSON_STRING(userCode)->string));
-  stage1->verificationURL = strdup(buffer_string(JSON_STRING(verificationUrl)->string));
+  stage1->pollInterval = response.interval;
+  stage1->expireTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) response.expiresIn);
+  stage1->deviceCode = strdup(buffer_string(response.deviceCode));
+  stage1->userCode = strdup(buffer_string(response.userCode));
+  stage1->verificationURL = strdup(buffer_string(response.verificationURL));
   
   if (!stage1->userCode || !stage1->verificationURL || !stage1->deviceCode) {
     res = -ENOMEM;

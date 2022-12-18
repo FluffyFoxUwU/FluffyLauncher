@@ -1,8 +1,11 @@
 #include <pthread.h>
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
+#include "util.h"
 #include "circular_buffer.h"
 #include "bug.h"
 
@@ -105,6 +108,32 @@ int circular_buffer_write(struct circular_buffer* self, const void* data, size_t
   
   pthread_cond_broadcast(&self->lockCond);
   return 0;
+}
+
+static int waitStub(struct circular_buffer* self, int timeout, bool (*checkFunc)(struct circular_buffer*, size_t)) {
+  int currentMs = timeout;
+
+  pthread_mutex_lock(&self->lock);
+  while (checkFunc(self, 1) && (currentMs > 0 || timeout == 0)) {
+    pthread_cond_timedwait(&self->lockCond, &self->lock, util_milisec_to_timespec_ptr(1));
+    util_msleep(1);
+    if (timeout > 0)
+      currentMs--;
+  }
+  
+  if (checkFunc(self, 1))
+    currentMs = -ETIMEDOUT;
+  
+  pthread_mutex_unlock(&self->lock);
+  return currentMs;
+}
+
+int circular_buffer_wait_until_empty(struct circular_buffer* self, int timeout) {
+  return waitStub(self, timeout, circular_buffer_can_read);
+}
+
+int circular_buffer_wait_until_full(struct circular_buffer* self, int timeout) {
+  return waitStub(self, timeout, circular_buffer_can_write);
 }
 
 size_t circular_buffer_get_usage(struct circular_buffer* self) {

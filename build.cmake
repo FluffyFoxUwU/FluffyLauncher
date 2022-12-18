@@ -22,6 +22,7 @@ set(BUILD_SOURCES
   src/auth/xbl_like_auth.c
   
   src/minecraft_api/api.c
+  src/minecraft_api/schema.c
   
   src/networking/http_request.c
   src/networking/http_response.c
@@ -35,6 +36,7 @@ set(BUILD_SOURCES
  
   src/util/circular_buffer.c
   src/util/util.c
+  src/util/json_schema_loader.c
   
   src/logging/logging.c
   src/io/io_threads.c
@@ -45,6 +47,7 @@ set(BUILD_SOURCES
   src/parser/json/decoder.c
   
   src/dummy.c
+  src/panic.c
   
   src/submodules/cJSON/cJSON.c
   

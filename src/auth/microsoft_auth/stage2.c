@@ -7,10 +7,13 @@
 #include <inttypes.h>
 #include <unistd.h>
 
+#include "buffer.h"
 #include "bug.h"
 #include "networking/http_request.h"
 #include "networking/http_response.h"
 #include "networking/transport/transport.h"
+#include "panic.h"
+#include "util/json_schema_loader.h"
 #include "parser/json/decoder.h"
 #include "stage2.h"
 #include "auth/microsoft_auth.h"
@@ -44,6 +47,23 @@ void microsoft_auth_stage2_free(struct microsoft_auth_stage2 *self) {
   free(self);
 }
 
+struct stage2_response {
+  double expireIn;
+  buffer_t* token;
+  buffer_t* tokenType;
+  buffer_t* refreshToken;
+};
+
+static const struct json_schema stage2ResponseSchema = {
+  .entries = {
+    JSON_SCHEMA_ENTRY("$.access_token", JSON_STRING, struct stage2_response, token),
+    JSON_SCHEMA_ENTRY("$.token_type", JSON_STRING, struct stage2_response, tokenType),
+    JSON_SCHEMA_ENTRY("$.refresh_token", JSON_STRING, struct stage2_response, refreshToken),
+    JSON_SCHEMA_ENTRY("$.expires_in", JSON_NUMBER, struct stage2_response, expireIn),
+    {}
+  }
+};
+
 static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLen) {
   int res = 0;
   struct json_node* root = NULL;
@@ -66,7 +86,6 @@ static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLe
   }
   
   if (error) {
-    printk("err: %p\n", error);
     const char* errorStr = buffer_string(JSON_STRING(error)->string);
     if (strcmp(errorStr, "authorization_pending") == 0) {
       res = 0;
@@ -79,40 +98,26 @@ static int process(struct microsoft_auth_stage2* self, char* body, size_t bodyLe
       goto token_not_ready;
     }
     
-    BUG_ON(strcmp(errorStr, "bad_verification_code") == 0);
+    if (strcmp(errorStr, "bad_verification_code") == 0)
+      panic("Bad verification code shouldnt happen");
+    panic("Unknown error: %s", errorStr);
   }
   
   // Mandatory
-  struct json_node* tokenType;
-  struct json_node* expiresIn;
-  struct json_node* accessToken;
-  if (json_get_member(root, "token_type", &tokenType) < 0 ||
-      json_get_member(root, "expires_in", &expiresIn) < 0 ||
-      json_get_member(root, "access_token", &accessToken) < 0 ||
-      tokenType->type != JSON_STRING ||
-      expiresIn->type != JSON_NUMBER ||
-      accessToken->type != JSON_STRING ||
-      JSON_NUMBER(expiresIn)->number < 0 || JSON_NUMBER(expiresIn)->number >= (double) UINT64_MAX) {
+  struct stage2_response response = {};
+  if ((res = json_schema_load(&stage2ResponseSchema, root, &response) < 0))
+    goto invalid_response;
+  
+  if (response.expireIn < 0 || response.expireIn >= (double) UINT64_MAX) {
     res = -EINVAL;
     goto invalid_response;
   }
   
-  if (strcmp(buffer_string(JSON_STRING(tokenType)->string), "Bearer") != 0)
-    pr_warn("Returned token type is not Bearer. Proceeding anyway");
+  self->result->expiresTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) response.expireIn);
+  self->result->refreshToken = strdup(buffer_string(response.refreshToken));
+  self->result->accessToken = strdup(buffer_string(response.token));
   
-  // Optional
-  struct json_node* refreshToken;  
-  getRes = json_get_member(root, "refresh_token", &refreshToken);
-  if (getRes != -ENODATA && (getRes < 0 || refreshToken->type != JSON_STRING)) {
-    res = -EINVAL;
-    goto invalid_response;
-  }
-  
-  self->result->expiresTimestamp = ((uint64_t) time(NULL)) + ((uint64_t) JSON_NUMBER(expiresIn)->number);
-  self->result->refreshToken = refreshToken ? strdup(buffer_string(JSON_STRING(refreshToken)->string)) : NULL;
-  self->result->accessToken = strdup(buffer_string(JSON_STRING(accessToken)->string));
-  
-  if (!self->result->accessToken || (refreshToken && !self->result->refreshToken)) {
+  if (!self->result->accessToken || !self->result->refreshToken) {
     res = -ENOMEM;
     goto out_of_memory;
   }
