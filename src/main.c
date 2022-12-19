@@ -8,6 +8,7 @@
 #include <threads.h>
 
 #include "auth/microsoft_auth.h"
+#include "logging/logging.h"
 #include "auth/minecraft_auth.h"
 #include "auth/xbox_live_auth.h"
 #include "auth/xsts_auth.h"
@@ -67,7 +68,7 @@ static int init() {
 static void shutdown() {
   stacktrace_cleanup();
   atomic_store(&shuttingDown, true);
-  pr_info("Shutting down logger thread. Bye!");
+  pr_info("Shutting down logger thread. Good bye UwU!");
   pthread_join(loggerThread, NULL);
   
   util_cleanup();
@@ -76,7 +77,8 @@ static void shutdown() {
 int main2(int argc, char** argv) {
   int initResult = init();
   if (initResult < 0) {
-  
+    pr_emerg("Failure initializing launcher");
+    return EXIT_FAILURE;
   }
   
   struct microsoft_auth_result* microsoftResult = NULL;
