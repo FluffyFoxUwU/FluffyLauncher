@@ -9,7 +9,9 @@
 #include "buffer.h"
 #include "util/circular_buffer.h"
 #include "logging.h"
+#include "config.h"
 #include "bug.h"
+#include "util/uwuify.h"
 #include "util/util.h"
 
 // Need to replace BUG as at very extraordinary when ALL star aligns
@@ -55,6 +57,16 @@ static void recordNoLock(const char* msg) {
   const char* threadName = util_get_thread_name(pthread_self());
   if (threadName == NULL)
     threadName = "<unknown>";
+  
+  if (IS_ENABLED(CONFIG_UWUIFY_THREAD_NAME))
+    threadName = uwuify_do_easy(threadName);
+  
+  if (IS_ENABLED(CONFIG_UWUIFY_LOG_FORCE)) {
+    char logLevel = msg[0];
+    char* tmp = uwuify_do_easy2(msg);
+    tmp[0] = logLevel;
+    msg = tmp;
+  }
   
   size_t msgLen = strlen(msg) - 1;
   size_t threadNameLen = strlen(threadName);
@@ -107,6 +119,13 @@ void printk_va(const char* fmt, va_list args) {
   // You may UwU-ify `fmt` here
   // to UwU-ify every log entries
 
+  if (IS_ENABLED(CONFIG_UWUIFY_LOG_FORMAT)) {
+    char logLevel = fmt[0];
+    char* tmp = uwuify_do_printf_compatible_easy(fmt);
+    tmp[0] = logLevel;
+    fmt = tmp;
+  }
+  
   static thread_local char localPrintkBuffer[PRINTK_BUFFER_SIZE]; 
   size_t bytesWritten = vsnprintf(localPrintkBuffer, sizeof(localPrintkBuffer), fmt, args);
   

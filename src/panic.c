@@ -7,9 +7,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "panic.h"
 #include "logging/logging.h"
 #include "stacktrace/stacktrace.h"
+#include "util/uwuify.h"
 
 static atomic_bool hasPanic;
 
@@ -45,6 +47,9 @@ void _panic_va(const char* fmt, va_list list) {
   
   // Using static buffer as panic might occur on OOM scenario
   static char panicBuffer[512 * 1024 * 1024] = {0};
+  
+  if (IS_ENABLED(CONFIG_UWUIFY_LOG_FORMAT))
+    fmt = uwuify_do_printf_compatible_easy(fmt);
   
   size_t panicMsgLen = vsnprintf(panicBuffer, sizeof(panicBuffer), fmt, list);
   pr_emerg("Program panic: %s", panicBuffer);

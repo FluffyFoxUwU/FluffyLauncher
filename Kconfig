@@ -229,6 +229,50 @@ menu "JSON Decoder and Encoder"
     range 0 1024
 endmenu
 
+menu "Fun"
+  config UWUIFY
+    bool "Enable UwU-ify"
+    default n
+    help
+      This does nothing other than showing showing UwU-ify related options
+      for fun
+      Thiz doez nyothing othew than showing UwU-ify wewated options
+      fow f-fuwun 
+  
+  config FUN_TEXT_TRANSFORMATION
+    def_bool n
+  
+  config UWUIFY_LOG_FORMAT
+    bool "UwU-ify log formats"
+    default n
+    depends on UWUIFY
+    depends on !UWUIFY_LOG_FORCE
+    help
+      This has effect of UwU-ing all logs made by program
+      Thiz has effect of UwU-ing aww wogs made by pwogwam
+
+  config UWUIFY_THREAD_NAME
+    bool "UwU-ify thread names"
+    default n
+    depends on UWUIFY
+    select FUN_TEXT_TRANSFORMATION
+    help
+      This has effect of UwU-ing all thread names
+      Thiz has effect of UwU-ing aww t-thwead nyames
+
+  config UWUIFY_LOG_FORCE
+    bool "Force UwU-ify on log buffer"
+    default n
+    depends on UWUIFY
+    select UWUIFY_THREAD_NAME
+    select FUN_TEXT_TRANSFORMATION
+    help
+      This has effect of UwU-ing practically everything that logging subsystem
+      writes to circular buffer (actually this UwU-ify happen right before writing)
+      Thiz has effect of U-UwU-ing pwacticawwy evewything that wogging subsystem
+      wwitez t-to ciwcuwaw buffew (actuawwy this UwU-ify h-happen wight befowe wwiting)
+endmenu
+
 config DONT_START_SEPERATE_MAIN_THREAD
   bool "Don't start seperate main thread"
   default n

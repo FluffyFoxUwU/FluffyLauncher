@@ -38,6 +38,7 @@ set(BUILD_SOURCES
  
   src/util/circular_buffer.c
   src/util/util.c
+  src/util/uwuify.c
   src/util/json_schema_loader.c
   
   src/logging/logging.c
