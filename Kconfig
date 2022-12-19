@@ -68,6 +68,20 @@ menu Debugging
       string "Default UBSAN options"
       default "print_stacktrace=1:suppressions=suppressions/UBSan.supp"
   endmenu  
+  
+  config ENABLE_STACKTRACE
+    bool "Enable stacktrace support"
+    depends on !STRICTLY_POSIX
+    help
+      This prints stacktrace for panics, bugs, etc
+  
+  choice
+    prompt "Stacktrace provider"
+    depends on ENABLE_STACKTRACE
+    
+    config STACKTRACE_PROVIDER_LIBBACKTRACE
+      bool "libbacktrace"
+  endchoice
 endmenu
 
 menu General

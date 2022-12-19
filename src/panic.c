@@ -2,12 +2,14 @@
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stddef.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "panic.h"
 #include "logging/logging.h"
+#include "stacktrace/stacktrace.h"
 
 static atomic_bool hasPanic;
 
@@ -17,7 +19,19 @@ static void init() {
 }
 
 static void dumpStacktrace() {
-
+  int res = stacktrace_walk_through_stack(^int (struct stacktrace_element* element) {
+    if (element->sourceInfoPresent)
+      pr_emerg("  at %s(%s:%d)", element->prettySymbolName, element->sourceFile, element->sourceLine);
+    else
+      pr_emerg("  at %p(Source.c:-1)", (void*) element->ip);
+    
+    if (element->count > 1)
+      pr_emerg("  ... previous frame repeats %d times ...", element->count - 1);
+    return 0;
+  });
+  
+  if (res == -ENOSYS)
+    pr_warn("Stacktrace unavailable");
 }
 
 void _panic_va(const char* fmt, va_list list) {
@@ -35,8 +49,8 @@ void _panic_va(const char* fmt, va_list list) {
   if (panicMsgLen >= sizeof(panicBuffer)) 
     pr_alert("Panic message was truncated! (%zu bytes to %zu bytes)", panicMsgLen, sizeof(panicBuffer) - 1); 
   
-  pr_info("Flushing log...");
   dumpStacktrace();
+  pr_info("Flushing log...");
   if (!logging_flush())
     pr_alert("Flushing log failed. Logs may be incomplete please dump log entries from debugger");
   

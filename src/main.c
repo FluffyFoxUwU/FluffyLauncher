@@ -24,6 +24,7 @@
 #include "networking/transport/transport_ssl.h"
 #include "config.h"
 #include "parser/json/decoder.h"
+#include "stacktrace/stacktrace.h"
 #include "util/json_schema_loader.h"
 #include "parser/json/json.h"
 #include "util/util.h"
@@ -54,6 +55,8 @@ int main2(int argc, char** argv) {
   
   pthread_t loggerThread;
   pthread_create(&loggerThread, NULL, logReader, NULL);
+  
+  stacktrace_init();
   
   struct microsoft_auth_result* microsoftResult = NULL;
   
@@ -128,6 +131,7 @@ microsoft_auth_failure:
   
   pr_info("Shutting down...");
   
+  stacktrace_cleanup();
   atomic_store(&shuttingDown, true);
   pr_info("Shutting down logger thread. Bye!");
   pthread_join(loggerThread, NULL);

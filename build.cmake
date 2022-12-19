@@ -23,6 +23,8 @@ set(BUILD_SOURCES
   
   src/minecraft_api/api.c
   src/minecraft_api/schema.c
+  src/stacktrace/stacktrace.c
+  src/stacktrace/provider/libbacktrace.c
   
   src/networking/http_request.c
   src/networking/http_response.c
@@ -98,6 +100,10 @@ macro(AddDependencies)
   # AddPkgConfigLib(FluffyGC FluffyGC>=1.0.0)
   
   link_libraries(-lcrypto -lssl)
+  
+  if (DEFINED CONFIG_STACKTRACE_PROVIDER_LIBBACKTRACE)
+    link_libraries(-lbacktrace)
+  endif()
 endmacro()
 
 
