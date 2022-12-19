@@ -6,6 +6,7 @@
 
 #include "http_headers.h"
 #include "list.h"
+#include "panic.h"
 #include "util/util.h"
 #include "hashmap.h"
 #include "http_headers_serializer/normal.h"

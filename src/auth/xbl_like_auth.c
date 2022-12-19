@@ -43,6 +43,11 @@ static const struct json_schema xblLike200ResponseSchema = {
 static int processResult200(struct xbl_like_auth_result* self, struct json_node* root) {
   int res = 0;
   struct xbl_like_200_response response = {};
+  if (root == NULL) {
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
   if ((res = json_schema_load(&xblLike200ResponseSchema, root, &response)) < 0)
     goto invalid_response;
   
@@ -73,7 +78,7 @@ static const struct json_schema xblLike401ResponseSchema = {
 
 static int processResult401(struct xbl_like_auth_result* self, struct json_node* root) {
   int res = 0;
-  if (root->type != JSON_OBJECT) {
+  if (root == NULL) {
     res = -EINVAL;
     goto invalid_response;
   }

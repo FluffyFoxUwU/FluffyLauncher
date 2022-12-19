@@ -82,6 +82,11 @@ menu Debugging
     config STACKTRACE_PROVIDER_LIBBACKTRACE
       bool "libbacktrace"
   endchoice
+  
+  config STACKTRACE_USE_DLADDR
+    bool "Use dladdr to get function name if debug info unavailable"
+    depends on ENABLE_STACKTRACE && !STRICTLY_POSIX
+  
 endmenu
 
 menu General

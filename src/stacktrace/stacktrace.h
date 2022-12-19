@@ -20,7 +20,7 @@ struct stacktrace_element {
   
   // Optional to stacktrace provider
   // for printing to user using this is recommended
-  const char* prettySymbolName;
+  const char* printableName;
   
   // Number of time this exact frame occured (like
   // in recursive functions)
@@ -35,7 +35,7 @@ typedef int (^stacktrace_walker_block)(struct stacktrace_element* element);
 // -ENOSYS: If unsupported
 int stacktrace_walk_through_stack(stacktrace_walker_block walker);
 
-void stacktrace_init();
+int stacktrace_init();
 void stacktrace_cleanup();
 
 #endif

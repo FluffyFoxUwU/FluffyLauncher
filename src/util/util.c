@@ -16,6 +16,7 @@
 #include "bug.h"
 #include "hashmap_base.h"
 #include "util.h"
+#include "logging/logging.h"
 
 size_t util_vasprintf(char** buffer, const char* fmt, va_list args) {
   va_list copy;
@@ -106,11 +107,17 @@ int util_thread_create(pthread_t* newthread, pthread_attr_t* attr, void* (*routi
   return res;
 }
 
-int util_set_thread_name(pthread_t thread, const char* name) {
-  BUG_ON(atomic_load(&inited) == false);
-  BUG_ON(isManaged == false);
+void util_set_thread_name(pthread_t thread, const char* name) {
+  if (atomic_load(&inited) == false) {
+    pr_warn("%s: Called before utility initialized! (Will result in noop)", __func__);
+    return;
+  }
   
-  int res = 0;
+  if (isManaged == false) {
+    pr_warn("%s: Called on unmanaged thread (Expect small memory leak)", __func__);
+    return;
+  }
+  
   pthread_rwlock_wrlock(&accessLock);
   
   const char* existing = hashmap_get(&threadNames, &thread);
@@ -121,24 +128,25 @@ int util_set_thread_name(pthread_t thread, const char* name) {
   
   const char* clone = strdup(name);
   if (!clone) {
-    res = -ENOMEM;
+    pr_warn("%s: Out of memory thread name not recorded", __func__);
     goto name_clone_failed;
   }
   
   if (hashmap_put(&threadNames, &thread, clone) < 0) {
     free((char*) clone);
-    res = -ENOMEM;
+    pr_warn("%s: Out of memory thread name not recorded", __func__);
     goto insert_thread_failed;
   }
   
 insert_thread_failed:
 name_clone_failed:
   pthread_rwlock_unlock(&accessLock);
-  return res;
+  return;
 }
 
 const char* util_get_thread_name(pthread_t thread) {
-  BUG_ON(atomic_load(&inited) == false);
+  if (atomic_load(&inited) == false)
+    return NULL;
   
   pthread_rwlock_rdlock(&accessLock);
   const char* existing = hashmap_get(&threadNames, &thread);

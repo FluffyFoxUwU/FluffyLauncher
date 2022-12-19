@@ -71,10 +71,16 @@ int minecraft_auth(const char* userhash, const char* xstsToken, struct minecraft
   if (res < 0)
     goto request_error;
   
+  if (responseJSON == NULL) {
+    res = -EINVAL;
+    goto invalid_response;
+  }
+  
   if (res == 200) 
     res = processResult200(self, responseJSON);
   json_free(responseJSON);
   
+invalid_response:
   if (res < 0)
     pr_critical("Error processing Minecraft services API response: %d", res);
 request_error:

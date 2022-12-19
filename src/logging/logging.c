@@ -53,6 +53,9 @@ static enum log_level logLevelLookup[256] = {
 
 static void recordNoLock(const char* msg) {
   const char* threadName = util_get_thread_name(pthread_self());
+  if (threadName == NULL)
+    threadName = "<unknown>";
+  
   size_t msgLen = strlen(msg) - 1;
   size_t threadNameLen = strlen(threadName);
   struct log_entry entry = {

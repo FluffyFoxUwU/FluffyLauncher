@@ -24,7 +24,7 @@ int util_parse_hex_size_t(const char* string, size_t* result);
 
 // Errors:
 // -ENOMEM: On error
-int util_set_thread_name(pthread_t thread, const char* name);
+void util_set_thread_name(pthread_t thread, const char* name);
 const char* util_get_thread_name(pthread_t thread);
 
 int util_thread_create(pthread_t* newthread, pthread_attr_t* attr, void* (*routine)(void *), void* arg);

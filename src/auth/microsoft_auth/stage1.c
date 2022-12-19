@@ -111,6 +111,11 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   if (res < 0)
     goto request_error;
   
+  if (responseJson == NULL) {
+    res = -EINVAL;
+    goto no_content;
+  }
+  
   // pr_notice("Getting devicecode at %s:%d/%s", self->arg->hostname, self->arg->port, req->location);
   if ((res = processResponse(self, responseJson)) < 0) {
     pr_critical("Processing Microsoft authentication server response failed: %d", res);
@@ -118,6 +123,7 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
   }
   json_free(responseJson);
 
+no_content:
 process_response_failed:
 request_error:
 request_body_creation_error:

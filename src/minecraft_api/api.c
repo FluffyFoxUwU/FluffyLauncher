@@ -55,6 +55,11 @@ int minecraft_api_get_profile(struct minecraft_api* self) {
   if ((res = networking_easy_do_json_http_rpc(&self->lastJSON, true, HTTP_GET, CONFIG_MINECRAFT_API_HOSTNAME, "/minecraft/profile", self->requestHeaders, "")) < 0)
     goto send_request_error;
 
+  if (self->lastJSON == NULL) {
+    res = -EFAULT;
+    goto invalid_response;
+  }
+
   struct minecraft_api_profile_raw profile = {};
   
   if ((res = minecraft_api_response_parse_profile(self->lastJSON, &profile)) < 0)

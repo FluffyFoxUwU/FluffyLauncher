@@ -21,7 +21,9 @@ static void init() {
 static void dumpStacktrace() {
   int res = stacktrace_walk_through_stack(^int (struct stacktrace_element* element) {
     if (element->sourceInfoPresent)
-      pr_emerg("  at %s(%s:%d)", element->prettySymbolName, element->sourceFile, element->sourceLine);
+      pr_emerg("  at %s(%s:%d)", element->printableName, element->sourceFile, element->sourceLine);
+    else if (element->symbolName)
+      pr_emerg("  at %s(Source.c:-1)", element->symbolName);
     else
       pr_emerg("  at %p(Source.c:-1)", (void*) element->ip);
     

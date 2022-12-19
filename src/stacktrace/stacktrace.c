@@ -1,9 +1,12 @@
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 
 #include "stacktrace/stacktrace.h"
 #include "stacktrace/provider/libbacktrace.h"
 #include "config.h"
+
+static bool stacktraceEnabled = false;
 
 int stacktrace_walk_through_stack(stacktrace_walker_block walker) {
   int res = 0;
@@ -25,8 +28,11 @@ int stacktrace_walk_through_stack(stacktrace_walker_block walker) {
     return 0;
   };
   
+  if (!stacktraceEnabled)
+    return -ENOSYS;
+  
 # if IS_ENABLED(CONFIG_STACKTRACE_PROVIDER_LIBBACKTRACE)
-  res = stacktrace_libbacktrace_walk_through_stack(walkerBlock);
+  stacktrace_libbacktrace_walk_through_stack(walkerBlock);
 # else
   res = -ENOSYS;
   (void) walkerBlock;
@@ -34,10 +40,15 @@ int stacktrace_walk_through_stack(stacktrace_walker_block walker) {
   return res;
 }
 
-void stacktrace_init() {
+int stacktrace_init() {
+  int res = -ENOSYS;
 # if IS_ENABLED(CONFIG_STACKTRACE_PROVIDER_LIBBACKTRACE)
-  stacktrace_libbacktrace_init();
+  res = stacktrace_libbacktrace_init();
 # endif
+  
+  if (res >= 0)
+    stacktraceEnabled = true;
+  return res;
 }
 
 void stacktrace_cleanup() {

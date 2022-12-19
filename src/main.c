@@ -31,6 +31,7 @@
 #include "util/circular_buffer.h"
 
 static atomic_bool shuttingDown = false;
+static pthread_t loggerThread;
 
 static void* logReader(void* v) {
   struct log_entry entry;
@@ -41,8 +42,17 @@ static void* logReader(void* v) {
   return NULL;
 }
 
-int main2(int argc, char** argv) {
+static int init() {
+  int res = 0;
+  if ((res = util_thread_create(&loggerThread, NULL, logReader, NULL)) < 0) {
+    fprintf(stderr, "Critical error: Cannot start log reader thread aborting: %s", strerror(-res));
+    return -EFAULT;
+  }
+  
   util_init();
+  util_set_thread_name(pthread_self(), "Main-Thread");
+  
+  pr_info("Fluffy Launcher starting...");
   
   SSL_load_error_strings();
   SSL_library_init();
@@ -50,13 +60,24 @@ int main2(int argc, char** argv) {
   OpenSSL_add_all_ciphers();
   OpenSSL_add_all_digests();
   
-  util_set_thread_name(pthread_self(), "Main-Thread");
-  pr_info("Fluffy Launcher starting...");
-  
-  pthread_t loggerThread;
-  pthread_create(&loggerThread, NULL, logReader, NULL);
-  
   stacktrace_init();
+  return res;
+}
+
+static void shutdown() {
+  stacktrace_cleanup();
+  atomic_store(&shuttingDown, true);
+  pr_info("Shutting down logger thread. Bye!");
+  pthread_join(loggerThread, NULL);
+  
+  util_cleanup();
+}
+
+int main2(int argc, char** argv) {
+  int initResult = init();
+  if (initResult < 0) {
+  
+  }
   
   struct microsoft_auth_result* microsoftResult = NULL;
   
@@ -130,13 +151,7 @@ xbl_auth_failure:
 microsoft_auth_failure:
   
   pr_info("Shutting down...");
-  
-  stacktrace_cleanup();
-  atomic_store(&shuttingDown, true);
-  pr_info("Shutting down logger thread. Bye!");
-  pthread_join(loggerThread, NULL);
-  
-  util_cleanup();
+  shutdown();
   return EXIT_SUCCESS;
 }
 
