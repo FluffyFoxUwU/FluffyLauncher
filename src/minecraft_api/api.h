@@ -8,12 +8,24 @@ struct minecraft_api_profile {
   const char* username;
 };
 
+enum minecraft_api_error_code {
+  MINECRAFT_API_OK,
+  MINECRAFT_API_NETWORK_ERROR,
+  MINECRAFT_API_PARSE_SERVER_ERROR,
+  MINECRAFT_API_GENERIC_ERROR,
+  MINECRAFT_API_NOT_FOUND
+};
+
 struct minecraft_api_error {
   const char* path;
   const char* error;
   const char* errorType;
-  const char* userMessage;
+  const char* errorMessage;
   const char* developerMessage;
+  
+  // errorNum is set for MINECRAFT_API_NETWORK_ERROR
+  // otherwise undefined
+  int errorNum;
 };
 
 struct minecraft_api {
@@ -38,7 +50,10 @@ void minecraft_api_free(struct minecraft_api* self);
 // API calls
 
 // Result in self->profile (valid until next API call)
-int minecraft_api_get_profile(struct minecraft_api* self);
+// Errors: 
+// MINECRAFT_API_NOT_FOUND: Profile cant be found 
+enum minecraft_api_error_code minecraft_api_get_profile(struct minecraft_api* self);
+
 bool minecraft_api_have_own_minecraft(struct minecraft_api* self);
 
 #endif

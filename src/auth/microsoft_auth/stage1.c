@@ -1,4 +1,6 @@
 #include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 
@@ -88,13 +90,6 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     goto location_creation_error;
   }
   
-  char* requestBody = NULL;
-  size_t requestBodyLen = util_asprintf(&requestBody, "client_id=%s&scope=%s", self->arg->clientID, self->arg->scope);
-  if (!requestBody) {
-    res = -ENOMEM;
-    goto request_body_creation_error;
-  }
-  
   struct json_node* responseJson;
   struct easy_http_headers headers[] = {
     {"Content-Type", "application/x-www-form-urlencoded"}, 
@@ -106,7 +101,6 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
                                          HTTP_POST, 
                                          self->arg->hostname, location, 
                                          headers,
-                                         requestBody, requestBodyLen, 
                                          "client_id=%s&scope=%s", self->arg->clientID, self->arg->scope);
   if (res < 0)
     goto request_error;
@@ -121,12 +115,11 @@ int microsoft_auth_stage1_run(struct microsoft_auth_stage1* self) {
     pr_critical("Processing Microsoft authentication server response failed: %d", res);
     goto process_response_failed;
   }
-  json_free(responseJson);
 
 no_content:
 process_response_failed:
+  json_free(responseJson);
 request_error:
-request_body_creation_error:
   free(location);
 location_creation_error:
   return res;

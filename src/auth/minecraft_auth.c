@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "buffer.h"
+#include "bug.h"
 #include "minecraft_auth.h"
 #include "config.h"
 #include "networking/easy.h"

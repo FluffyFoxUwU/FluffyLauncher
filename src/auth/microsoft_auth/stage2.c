@@ -214,10 +214,12 @@ poll_error:
 poll_request_creation_error:
   free(location);
 location_creation_error:
-  if (res == -ETIMEDOUT || time(NULL) >= self->stage1->expireTimestamp)
+  if (res == -ETIMEDOUT || time(NULL) >= self->stage1->expireTimestamp) {
     pr_critical("Cannot obtain token, code expired! Please try again later");
-  else if (res == -EPERM)
+    res = -ETIMEDOUT;
+  } else if (res == -EPERM) {
     pr_critical("Access declined cannot log in");
+  }
   return res;
 }
 

@@ -102,6 +102,10 @@ macro(AddDependencies)
   
   link_libraries(-lcrypto -lssl)
   
+  if (DEFINED CONFIG_STACKTRACE_USE_DLADDR)
+    link_libraries(-ldl)
+  endif()
+  
   if (DEFINED CONFIG_STACKTRACE_PROVIDER_LIBBACKTRACE)
     link_libraries(-lbacktrace)
   endif()

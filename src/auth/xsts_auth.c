@@ -11,6 +11,7 @@ int xsts_auth(const char* xblToken, struct xsts_auth_result** result) {
   struct xsts_auth_result* self = malloc(sizeof(*self));
   if (!self)
     return -ENOMEM;
+  *self = (struct xsts_auth_result) {};
   
   char* requestBody = NULL;
   util_asprintf(&requestBody, 

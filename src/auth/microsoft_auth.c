@@ -43,7 +43,7 @@ stage2_failure:
   microsoft_auth_stage2_free(stage2);
 stage1_failure:
   microsoft_auth_stage1_free(stage1);
-  if (resultPtr && res > 0)
+  if (resultPtr && res >= 0)
     *resultPtr = result;
   else
     microsoft_auth_free(result);

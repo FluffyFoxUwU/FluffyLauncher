@@ -5,6 +5,7 @@
 #include <stdatomic.h>
 #include <errno.h>
 #include <string.h>
+#include <signal.h>
 #include <threads.h>
 
 #include "auth/microsoft_auth.h"
@@ -74,12 +75,19 @@ static void shutdown() {
   util_cleanup();
 }
 
+[[maybe_unused]]
+static void sigHandler(int sig) {
+  panic("Signal %d occured -w-", sig);
+}
+
 int main2(int argc, char** argv) {
   int initResult = init();
   if (initResult < 0) {
     pr_emerg("Failure initializing launcher");
     return EXIT_FAILURE;
   }
+  
+  //signal(SIGSEGV, sigHandler);
   
   struct microsoft_auth_result* microsoftResult = NULL;
   
@@ -88,7 +96,7 @@ int main2(int argc, char** argv) {
     .tenant = "consumers",
     .hostname = CONFIG_MICROSOFT_LOGIN_HOSTNAME,
     .scope = "XboxLive.signin%20offline_access",
-    .refreshToken = CONFIG_TMP_REFRESH_TOKEN,
+    .refreshToken = NULL,
     
     .protocol = MICROSOFT_AUTH_HTTPS,
     .port = 443
@@ -135,11 +143,18 @@ int main2(int argc, char** argv) {
     goto minecraft_api_create_failure;
   }
   
+  if (!minecraft_api_have_own_minecraft(minecraftAPI)) {
+    pr_alert("You dont have Minecraft profile associated please get one");
+    pr_alert("If you use XBox game pass and this is mistake please login in official launcher once");
+    goto user_dont_have_minecraft;
+  }
+  
   if ((res = minecraft_api_get_profile(minecraftAPI)) < 0)
     goto fail_to_fetch_profile;
   pr_info("Sucessfully getting Minecraft profile...");
   
   pr_info("Logged in as %s (UUID: %s)", minecraftAPI->callResult.profile.username, minecraftAPI->callResult.profile.uuid);
+user_dont_have_minecraft:
 fail_to_fetch_profile:
   minecraft_api_free(minecraftAPI);
 minecraft_api_create_failure:

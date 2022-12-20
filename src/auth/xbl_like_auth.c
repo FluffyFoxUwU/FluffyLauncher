@@ -95,19 +95,24 @@ static int processResult401(struct xbl_like_auth_result* self, struct json_node*
   switch ((uint64_t) response.xerr) {
     case XBL_LIKE_UNDERAGE:
       pr_alert("Unable to authenticate: Your account is underage unless added to family by an adult");
+      res = -EFAULT;
       break;
     case XBL_LIKE_NO_XBOX_ACOUNT:
       pr_alert("Unable to authenticate: There is no XBox Live please create one");
+      res = -EFAULT;
       break;
     case XBL_LIKE_BANNED_OR_UNAVAILABLE:
       pr_alert("Unable to authenticate: XBox Live unavailable/banned in your country");
+      res = -EFAULT;
       break;
     case XBL_LIKE_REQUIRE_ADULT_VERIFY:
     case XBL_LIKE_REQUIRE_ADULT_VERIFY2:
       pr_alert("Unable to authenticate: Adult verification needed (South Korea)");
+      res = -EFAULT;
       break;
     default:
       pr_alert("Unable to authenticate: Unknown XBox error: %" PRIu64, (uint64_t) response.xerr);
+      res = -EFAULT;
       break;
   }
 invalid_response:
